@@ -1,0 +1,331 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
+import { CheckCircle2, ImagePlus, LogIn, LogOut, Pencil, Plus, Printer, Receipt, Save, Settings, ShoppingBag, Trash2, UserPlus, X, XCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { DEFAULT_SETTINGS, FALLBACK_IMG, fetchProducts, fetchSettings, money, themeVars, uploadImage, type OrderRow, type Product, type SettingsData } from "@/lib/store";
+
+export const Route = createFileRoute("/admin")({
+  ssr: false,
+  head: () => ({
+    meta: [
+      { title: "Painel do dono | Nostra Casa" },
+      { name: "description", content: "Painel administrativo da Nostra Casa Pizzaria e Lanches." },
+      { property: "og:title", content: "Painel do dono | Nostra Casa" },
+      { property: "og:description", content: "Gerencie cardápio, pedidos e fotos da Nostra Casa." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+      { name: "robots", content: "noindex" },
+    ],
+  }),
+  component: AdminPanel,
+});
+
+const EMPTY_PRODUCT: Product = { id: "", name: "", description: "", price: 0, image_url: "", category: "Pizzas", is_combo: false, ingredients: [], extras: [], available: true, sort_order: 0 };
+
+function AdminPanel() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [checked, setChecked] = useState(false);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [view, setView] = useState<"overview" | "orders" | "menu" | "settings">("overview");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [settings, setSettings] = useState<SettingsData>(DEFAULT_SETTINGS);
+  const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [editing, setEditing] = useState<Product | null>(null);
+  const [notice, setNotice] = useState("");
+
+  const flash = (m: string) => { setNotice(m); setTimeout(() => setNotice(""), 2200); };
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => { setSession(data.session); setChecked(true); });
+    const { data } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => data.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!session) { setIsAdmin(null); return; }
+    supabase.from("user_roles").select("role").eq("user_id", session.user.id).eq("role", "admin").maybeSingle()
+      .then(({ data }) => {
+        setIsAdmin(!!data);
+        if (data) { void loadMenu(); void loadOrders(); }
+      });
+  }, [session?.user.id]);
+
+  async function loadMenu() {
+    const [p, s] = await Promise.all([fetchProducts(false), fetchSettings()]);
+    setProducts(p); setSettings(s);
+  }
+  async function loadOrders() {
+    const { data } = await supabase.from("orders").select("*").order("created_at", { ascending: false }).limit(100);
+    setOrders((data ?? []) as unknown as OrderRow[]);
+  }
+
+  const saveProduct = async (p: Product) => {
+    if (!p.name.trim()) return flash("Informe o nome do produto");
+    const payload = { name: p.name.trim(), description: p.description, price: Number(p.price) || 0, image_url: p.image_url || null, category: p.category || "Pizzas", is_combo: p.is_combo, ingredients: p.ingredients.filter(Boolean), extras: p.extras.filter(Boolean), available: p.available, sort_order: Number(p.sort_order) || 0 };
+    const { error } = p.id ? await supabase.from("products").update(payload).eq("id", p.id) : await supabase.from("products").insert(payload);
+    if (error) return flash("Erro ao salvar: " + error.message);
+    setEditing(null); await loadMenu(); flash("Produto salvo");
+  };
+  const deleteProduct = async (p: Product) => {
+    if (!confirm(`Remover "${p.name}" do cardápio?`)) return;
+    const { error } = await supabase.from("products").delete().eq("id", p.id);
+    if (error) return flash("Erro ao remover: " + error.message);
+    await loadMenu(); flash("Produto removido");
+  };
+  const toggleAvailable = async (p: Product) => {
+    await supabase.from("products").update({ available: !p.available }).eq("id", p.id);
+    await loadMenu();
+  };
+  const saveSettings = async (patch: Partial<SettingsData>) => {
+    const { id: _id, ...rest } = { ...settings, ...patch };
+    const { error } = settings.id
+      ? await supabase.from("store_settings").update({ ...rest, updated_at: new Date().toISOString() }).eq("id", settings.id)
+      : await supabase.from("store_settings").insert(rest);
+    if (error) return flash("Erro ao salvar: " + error.message);
+    await loadMenu(); flash("Configurações salvas");
+  };
+  const updateOrderStatus = async (id: string, status: string) => { await supabase.from("orders").update({ status }).eq("id", id); void loadOrders(); };
+  const deleteOrder = async (id: string) => { if (!confirm("Excluir este pedido?")) return; await supabase.from("orders").delete().eq("id", id); void loadOrders(); };
+  const printReceipt = (o: OrderRow) => {
+    const win = window.open("", "_blank", "width=400,height=600");
+    if (!win) return;
+    const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
+    const items = o.items.map((i) => `${i.quantity}x ${i.name}${i.details ? ` (${i.details})` : ""} - ${money(i.price * i.quantity)}`).join("\n");
+    const txt = `${settings.receipt_header}\n\n${new Date(o.created_at).toLocaleString("pt-BR")}\nCliente: ${o.customer_name}\n${o.order_type === "pickup" ? "RETIRADA NO BALCÃO" : `ENTREGA: ${o.address}, ${o.house_number} (${o.residence_type})`}\n\n${items}\n\nSubtotal: ${money(o.subtotal)}\nEntrega: ${money(o.delivery_fee)}\nTotal: ${money(o.total)}\n\nPagamento: ${o.payment_method}${o.change_for ? `\nTroco para: ${money(o.change_for)}` : ""}`;
+    win.document.write(`<pre style="font-family:monospace;font-size:12px;width:280px;margin:auto;padding:10px;white-space:pre-wrap">${esc(txt)}</pre>`);
+    win.document.close(); win.print();
+  };
+
+  if (!checked) return <div className="admin-login-page" style={themeVars(settings)}><p className="muted">Carregando...</p></div>;
+  if (!session) return <AuthCard settings={settings} />;
+  if (isAdmin === false) {
+    return (
+      <div className="admin-login-page" style={themeVars(settings)}><div className="admin-login-card">
+        <h2>Sem acesso</h2>
+        <p className="muted">Esta conta não é de administrador da loja.</p>
+        <button className="primary-btn full" onClick={() => supabase.auth.signOut()}><LogOut size={17} /> Sair</button>
+        <Link to="/" className="link-btn">Voltar para a loja</Link>
+      </div></div>
+    );
+  }
+
+  return (
+    <div className="app admin-full" style={themeVars(settings)}>
+      <header className="topbar admin-topbar">
+        <div className="brand"><div className="brand-mark">NC</div><div><strong>NOSTRA CASA</strong><span>PAINEL DO DONO</span></div></div>
+        <div className="header-actions">
+          <Link to="/" className="ghost-btn"><ShoppingBag size={17} /> Ver loja</Link>
+          <button className="ghost-btn" onClick={() => supabase.auth.signOut()}><LogOut size={17} /> Sair</button>
+        </div>
+      </header>
+      <main className="admin-main">
+        <div className="admin-tabs">
+          {([["overview", "Visão geral"], ["orders", "Pedidos"], ["menu", "Cardápio"], ["settings", "Fotos e configurações"]] as const).map(([k, l]) => (
+            <button key={k} className={view === k ? "active" : ""} onClick={() => { setView(k); if (k === "orders") void loadOrders(); }}>{l}</button>
+          ))}
+        </div>
+
+        {view === "overview" && (
+          <div className="admin-overview"><div className="admin-cards">
+            <div onClick={() => setView("orders")}><Receipt size={20} /><strong>Pedidos</strong><span>{orders.length} registrados</span></div>
+            <div onClick={() => setView("menu")}><ShoppingBag size={20} /><strong>Cardápio</strong><span>{products.length} itens</span></div>
+            <div onClick={() => setView("settings")}><Settings size={20} /><strong>Fotos e configurações</strong><span>Capa, logo, cores e recibo</span></div>
+          </div></div>
+        )}
+
+        {view === "orders" && (
+          <div className="admin-orders">
+            <button className="secondary-btn" onClick={() => void loadOrders()}>Atualizar lista</button>
+            {orders.length === 0 ? <p className="muted">Nenhum pedido registrado ainda.</p> : orders.map((o) => (
+              <div className="order-card" key={o.id}>
+                <div className="order-header">
+                  <strong>{o.customer_name}</strong>
+                  <span className={`order-status ${o.status}`}>{o.status === "approved" ? "Aprovado" : o.status === "rejected" ? "Recusado" : "Pendente"}</span>
+                </div>
+                <div className="order-items">{o.items.map((i, idx) => <span key={idx}>{i.quantity}x {i.name}{i.details ? ` (${i.details})` : ""}</span>)}</div>
+                <div className="order-meta">
+                  <span>{money(o.total)}</span><span>{o.payment_method}</span>
+                  <span>{o.order_type === "pickup" ? "Retirada" : `Entrega: ${o.address}, ${o.house_number}`}</span>
+                  <span>{new Date(o.created_at).toLocaleString("pt-BR")}</span>
+                </div>
+                <div className="order-actions">
+                  {o.status !== "approved" && <button className="small-btn approve" onClick={() => updateOrderStatus(o.id, "approved")}><CheckCircle2 size={15} /> Aprovar</button>}
+                  {o.status !== "rejected" && <button className="small-btn reject" onClick={() => updateOrderStatus(o.id, "rejected")}><XCircle size={15} /> Recusar</button>}
+                  <button className="small-btn" onClick={() => printReceipt(o)}><Printer size={15} /> Imprimir</button>
+                  <button className="small-btn" onClick={() => deleteOrder(o.id)}><Trash2 size={15} /> Excluir</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {view === "menu" && (
+          <div className="admin-menu">
+            <button className="primary-btn" onClick={() => setEditing({ ...EMPTY_PRODUCT, sort_order: products.length + 1 })}><Plus size={17} /> Novo produto</button>
+            {editing && !editing.id && <ProductForm key="new" product={editing} onSave={saveProduct} onCancel={() => setEditing(null)} onError={flash} />}
+            {products.map((p) => (
+              <div key={p.id}>
+                <div className="menu-item" style={{ opacity: p.available ? 1 : 0.5 }}>
+                  <div className="menu-item-img"><img src={p.image_url || FALLBACK_IMG} alt={p.name} /></div>
+                  <div className="menu-item-body">
+                    <strong>{p.name}</strong>
+                    <span>{money(p.price)} · {p.category}{p.available ? "" : " · Oculto"}</span>
+                    {p.is_combo && <span className="combo-flag">Combo</span>}
+                  </div>
+                  <div className="menu-item-actions">
+                    <button title={p.available ? "Ocultar da loja" : "Mostrar na loja"} onClick={() => toggleAvailable(p)}>{p.available ? <CheckCircle2 size={15} /> : <XCircle size={15} />}</button>
+                    <button title="Editar" onClick={() => setEditing(p)}><Pencil size={15} /></button>
+                    <button title="Remover" onClick={() => deleteProduct(p)}><Trash2 size={15} /></button>
+                  </div>
+                </div>
+                {editing?.id === p.id && <ProductForm key={p.id} product={editing} onSave={saveProduct} onCancel={() => setEditing(null)} onError={flash} />}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {view === "settings" && <SettingsForm key={settings.id} settings={settings} onSave={saveSettings} onError={flash} />}
+      </main>
+      {notice && <div className="toast">{notice}</div>}
+    </div>
+  );
+}
+
+function AuthCard({ settings }: { settings: SettingsData }) {
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [msg, setMsg] = useState("");
+  const [loading, setLoading] = useState(false);
+  const submit = async () => {
+    if (!email || password.length < 6) return setMsg("Preencha e-mail e senha (mínimo 6 caracteres)");
+    setLoading(true); setMsg("");
+    if (mode === "signup") {
+      const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${window.location.origin}/admin` } });
+      if (error) setMsg(error.message);
+      else if (!data.session) { setMsg("Conta criada! Confirme pelo link enviado ao seu e-mail e depois entre."); setMode("login"); }
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) setMsg(error.message === "Invalid login credentials" ? "E-mail ou senha incorretos" : error.message);
+    }
+    setLoading(false);
+  };
+  return (
+    <div className="admin-login-page" style={themeVars(settings)}>
+      <div className="admin-login-card">
+        <div className="brand"><div className="brand-mark">NC</div><div><strong>NOSTRA CASA</strong><span>PIZZARIA & LANCHES</span></div></div>
+        <div className="modal-kicker">Painel administrativo</div>
+        <h2>{mode === "login" ? "Entrar na conta" : "Criar conta"}</h2>
+        <p className="muted">{mode === "login" ? "Acesse o painel de gestão da pizzaria." : "A primeira conta criada vira a conta do dono."}</p>
+        <label>E-mail<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="seu@email.com" /></label>
+        <label>Senha<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} placeholder="Mínimo 6 caracteres" /></label>
+        {msg && <p className="auth-error">{msg}</p>}
+        <button className="primary-btn full" onClick={submit} disabled={loading}>
+          {loading ? "Aguarde..." : mode === "login" ? <><LogIn size={18} /> Entrar</> : <><UserPlus size={18} /> Criar conta</>}
+        </button>
+        <button className="link-btn" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setMsg(""); }}>
+          {mode === "login" ? "Não tenho conta. Criar agora" : "Já tenho conta. Fazer login"}
+        </button>
+        <Link to="/" className="link-btn">Voltar para a loja</Link>
+      </div>
+    </div>
+  );
+}
+
+function ImageField({ label, value, folder, onChange, onError }: { label: string; value: string | null; folder: string; onChange: (url: string) => void; onError: (m: string) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const pick = async (file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return onError("Escolha um arquivo de imagem");
+    setBusy(true);
+    try { onChange(await uploadImage(file, folder)); }
+    catch (e: any) { onError("Erro ao enviar imagem: " + (e?.message ?? "")); }
+    setBusy(false);
+    if (ref.current) ref.current.value = "";
+  };
+  return (
+    <div>
+      <label>{label}</label>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 6, flexWrap: "wrap" }}>
+        <img src={value || FALLBACK_IMG} alt="" className="favicon-preview" style={{ width: 80, height: 80 }} />
+        <button type="button" className="secondary-btn" disabled={busy} onClick={() => ref.current?.click()}><ImagePlus size={16} /> {busy ? "Enviando..." : "Enviar foto"}</button>
+        <input ref={ref} type="file" accept="image/*" hidden onChange={(e) => pick(e.target.files?.[0])} />
+      </div>
+      <input style={{ marginTop: 8 }} value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder="ou cole o link de uma imagem" />
+    </div>
+  );
+}
+
+function ListEditor({ title, items, onChange, placeholder }: { title: string; items: string[]; onChange: (v: string[]) => void; placeholder: string }) {
+  const [draft, setDraft] = useState("");
+  const add = () => { const v = draft.trim(); if (!v) return; onChange([...items, v]); setDraft(""); };
+  return (
+    <div className="form-section">
+      <strong>{title}</strong>
+      {items.length === 0 && <span className="muted" style={{ fontSize: 12 }}>Nenhum cadastrado.</span>}
+      {items.map((it, i) => (
+        <div className="add-tag" key={i}>
+          <input value={it} onChange={(e) => onChange(items.map((x, j) => (j === i ? e.target.value : x)))} />
+          <button type="button" title="Remover" style={{ background: "var(--button)", color: "white" }} onClick={() => onChange(items.filter((_, j) => j !== i))}><X size={16} /></button>
+        </div>
+      ))}
+      <div className="add-tag">
+        <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} placeholder={placeholder} />
+        <button type="button" title="Adicionar" onClick={add}><Plus size={16} /></button>
+      </div>
+    </div>
+  );
+}
+
+function ProductForm({ product, onSave, onCancel, onError }: { product: Product; onSave: (p: Product) => void; onCancel: () => void; onError: (m: string) => void }) {
+  const [f, setF] = useState<Product>(product);
+  const [saving, setSaving] = useState(false);
+  return (
+    <div className="product-form">
+      <h3>{f.id ? "Editar produto" : "Novo produto"}</h3>
+      <label>Nome<input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
+      <label>Descrição<textarea rows={2} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></label>
+      <label>Preço (R$)<input type="number" step="0.01" min="0" value={f.price} onChange={(e) => setF({ ...f, price: Number(e.target.value) })} /></label>
+      <label>Categoria<input list="cats" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} /></label>
+      <datalist id="cats"><option value="Combos" /><option value="Pizzas" /><option value="Lanches" /><option value="Bebidas" /></datalist>
+      <label>Ordem no cardápio<input type="number" value={f.sort_order} onChange={(e) => setF({ ...f, sort_order: Number(e.target.value) })} /></label>
+      <ImageField label="Foto do produto" value={f.image_url} folder="products" onChange={(url) => setF({ ...f, image_url: url })} onError={onError} />
+      <label className="check-label"><input type="checkbox" checked={f.is_combo} onChange={(e) => setF({ ...f, is_combo: e.target.checked })} /> É um combo (cliente escolhe borda e sabores)</label>
+      <label className="check-label"><input type="checkbox" checked={f.available} onChange={(e) => setF({ ...f, available: e.target.checked })} /> Mostrar na loja</label>
+      <ListEditor title="Ingredientes" items={f.ingredients} onChange={(v) => setF({ ...f, ingredients: v })} placeholder="Novo ingrediente" />
+      <ListEditor title="Adicionais / Extras" items={f.extras} onChange={(v) => setF({ ...f, extras: v })} placeholder="Novo adicional" />
+      <div className="form-actions">
+        <button className="secondary-btn" onClick={onCancel}>Cancelar</button>
+        <button className="primary-btn" disabled={saving} onClick={async () => { setSaving(true); await onSave(f); setSaving(false); }}><Save size={16} /> {saving ? "Salvando..." : "Salvar"}</button>
+      </div>
+    </div>
+  );
+}
+
+function SettingsForm({ settings, onSave, onError }: { settings: SettingsData; onSave: (p: Partial<SettingsData>) => Promise<void>; onError: (m: string) => void }) {
+  const [f, setF] = useState(settings);
+  const [saving, setSaving] = useState(false);
+  return (
+    <div className="settings-form">
+      <div className="settings-group">
+        <div className="modal-kicker">Fotos do site</div>
+        <ImageField label="Foto de capa (banner do topo)" value={f.cover_image_url} folder="site" onChange={(u) => setF({ ...f, cover_image_url: u })} onError={onError} />
+        <ImageField label="Foto de perfil / logo (círculo)" value={f.profile_image_url} folder="site" onChange={(u) => setF({ ...f, profile_image_url: u })} onError={onError} />
+        <ImageField label="Ícone da aba do navegador" value={f.favicon_url} folder="site" onChange={(u) => setF({ ...f, favicon_url: u })} onError={onError} />
+      </div>
+      <div className="settings-group">
+        <div className="modal-kicker">Cores do site</div>
+        <label>Cor principal (destaques)<input type="color" value={f.primary_color} onChange={(e) => setF({ ...f, primary_color: e.target.value })} /></label>
+        <label>Cor de fundo<input type="color" value={f.background_color} onChange={(e) => setF({ ...f, background_color: e.target.value })} /></label>
+        <label>Cor dos botões<input type="color" value={f.button_color} onChange={(e) => setF({ ...f, button_color: e.target.value })} /></label>
+      </div>
+      <div className="settings-group">
+        <div className="modal-kicker">Cabeçalho do recibo (impressora térmica)</div>
+        <textarea value={f.receipt_header} onChange={(e) => setF({ ...f, receipt_header: e.target.value })} rows={5} />
+      </div>
+      <button className="primary-btn full" disabled={saving} onClick={async () => { setSaving(true); await onSave(f); setSaving(false); }}><Save size={16} /> {saving ? "Salvando..." : "Salvar alterações"}</button>
+    </div>
+  );
+}
