@@ -1,24 +1,282 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowRight, Clock3, Download, LocateFixed, MapPin, Minus, Plus, ShoppingBag, Sparkles, X, Search, Home, Store, Pizza, CupSoda, UtensilsCrossed, Phone, Truck } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { DEFAULT_FLAVORS, DEFAULT_SETTINGS, FALLBACK_IMG, deliveryFee, fetchProducts, fetchSettings, money, themeVars, type CartItem, type Product, type SettingsData } from "@/lib/store";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
-  component: Index,
+  head: () => ({
+    meta: [
+      { title: "Nostra Casa Pizzaria e Lanches | Delivery em Londrina/PR" },
+      { name: "description", content: "Pizzas artesanais, combos e entrega rápida em Londrina/PR. Peça pelo site ou WhatsApp (43) 99630-9759." },
+      { property: "og:title", content: "Nostra Casa Pizzaria e Lanches" },
+      { property: "og:description", content: "Pizzas artesanais, combos e entrega rápida em Londrina/PR." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
+  component: Storefront,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+type BeforeInstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
+const categoryIcons: Record<string, typeof Truck> = { Todos: UtensilsCrossed, Combos: Sparkles, Pizzas: Pizza, Bebidas: CupSoda };
+
+function Storefront() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [settings, setSettings] = useState<SettingsData>(DEFAULT_SETTINGS);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [category, setCategory] = useState("Todos");
+  const [search, setSearch] = useState("");
+  const [step, setStep] = useState<"none" | "combo" | "checkout" | "success">("none");
+  const [selected, setSelected] = useState<Product | null>(null);
+  const [comboStep, setComboStep] = useState(1);
+  const [border, setBorder] = useState("Borda Catupiry");
+  const [selectedFlavors, setSelectedFlavors] = useState<string[]>([]);
+  const [upsell, setUpsell] = useState(false);
+  const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
+  const [orderType, setOrderType] = useState<"delivery" | "pickup">("delivery");
+  const [customer, setCustomer] = useState({ name: "", address: "", number: "", type: "Casa", payment: "Dinheiro", change: "", distance: "4" });
+  const [notice, setNotice] = useState("");
+  const [placing, setPlacing] = useState(false);
+
+  useEffect(() => {
+    Promise.all([fetchProducts(true), fetchSettings()])
+      .then(([p, s]) => { setProducts(p); setSettings(s); })
+      .catch(() => flash("Não foi possível carregar o cardápio"))
+      .finally(() => setLoading(false));
+    const handler = (e: Event) => { e.preventDefault(); setInstallEvent(e as BeforeInstallPromptEvent); };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  useEffect(() => {
+    if (!settings.favicon_url) return;
+    let link = document.querySelector<HTMLLinkElement>("link[rel='icon']");
+    if (!link) { link = document.createElement("link"); link.rel = "icon"; document.head.appendChild(link); }
+    link.href = settings.favicon_url;
+  }, [settings.favicon_url]);
+
+  function flash(msg: string) { setNotice(msg); setTimeout(() => setNotice(""), 2200); }
+
+  const categories = ["Todos", ...Array.from(new Set(products.map((p) => p.category)))];
+  const flavors = useMemo(() => {
+    const pizzas = products.filter((p) => p.category === "Pizzas").map((p) => p.name);
+    return Array.from(new Set([...pizzas, ...DEFAULT_FLAVORS]));
+  }, [products]);
+  const visibleProducts = products.filter((p) =>
+    (category === "Todos" || p.category === category) &&
+    (!search || `${p.name} ${p.description} ${p.ingredients.join(" ")}`.toLowerCase().includes(search.toLowerCase())));
+  const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+  const fee = orderType === "pickup" ? 0 : deliveryFee(Number(customer.distance) || 0);
+  const total = subtotal + fee;
+
+  const addToCart = (product: Product, details = "") => {
+    setCart((items) => {
+      const found = items.find((i) => i.id === product.id && i.details === details);
+      return found ? items.map((i) => (i === found ? { ...i, quantity: i.quantity + 1 } : i)) : [...items, { ...product, quantity: 1, details }];
+    });
+    flash("Adicionado ao carrinho");
+  };
+  const openProduct = (p: Product) => {
+    if (p.is_combo) { setSelected(p); setComboStep(1); setSelectedFlavors([]); setStep("combo"); }
+    else addToCart(p);
+  };
+  const finishCombo = (withDessert: boolean) => {
+    if (!selected) return;
+    const borderPrice = border === "Sem Borda" ? 0 : 8;
+    const details = `${border} · ${selectedFlavors.join(" + ")} · Guaraná 2L${withDessert ? " · Broto de Chocolate" : ""}`;
+    addToCart({ ...selected, price: selected.price + borderPrice + (withDessert ? 10 : 0) }, details);
+    setStep("none"); setUpsell(false);
+  };
+  const locate = () => {
+    navigator.geolocation?.getCurrentPosition((pos) => {
+      const storeLat = -23.3107, storeLng = -51.1628;
+      const dLat = (pos.coords.latitude - storeLat) * 111;
+      const dLng = (pos.coords.longitude - storeLng) * 111 * Math.cos((storeLat * Math.PI) / 180);
+      const rounded = Math.min(15, Math.max(1, Math.ceil(Math.sqrt(dLat * dLat + dLng * dLng))));
+      setCustomer((c) => ({ ...c, distance: String(rounded) }));
+      flash(`Distância calculada: ${rounded} km`);
+    }, () => flash("Não foi possível obter sua localização. Digite a distância."));
+  };
+  const sendWhatsApp = () => {
+    const lines = cart.map((i) => `${i.quantity}x ${i.name}${i.details ? ` (${i.details})` : ""} - ${money(i.price * i.quantity)}`).join("\n");
+    const paymentLabel = customer.payment === "Pix" ? "Pix (maquininha)" : customer.payment === "Dinheiro" ? `Dinheiro${customer.change ? ` (Troco para ${money(Number(customer.change))})` : ""}` : "Cartão (maquininha)";
+    const info = orderType === "pickup"
+      ? "*Retirada no Balcão*\nAv. Inglaterra, 210 - Londrina/PR"
+      : `*Entrega (Delivery)*\nEndereço: ${customer.address}, ${customer.number} - ${customer.type}\nDistância: ${customer.distance} km\nTaxa: ${fee ? money(fee) : "A consultar"}`;
+    const msg = `*Novo Pedido - Nostra Casa*\n\n${lines}\n\nSubtotal: ${money(subtotal)}\nEntrega: ${orderType === "pickup" ? "Grátis (retirada)" : fee ? money(fee) : "A consultar"}\n*Total: ${money(total)}*\n\n${info}\n\nPagamento: ${paymentLabel}\n\nCliente: ${customer.name}`;
+    window.open(`https://wa.me/5543996309759?text=${encodeURIComponent(msg)}`, "_blank");
+  };
+  const placeOrder = async () => {
+    if (!customer.name) return flash("Preencha seu nome");
+    if (orderType === "delivery" && (!customer.address || !customer.number)) return flash("Preencha endereço e número");
+    setPlacing(true);
+    const { error } = await supabase.from("orders").insert({
+      customer_name: customer.name,
+      address: orderType === "pickup" ? "Retirada no balcão" : customer.address,
+      house_number: orderType === "pickup" ? "-" : customer.number,
+      residence_type: orderType === "pickup" ? "Retirada" : customer.type,
+      distance_km: orderType === "pickup" ? 0 : Number(customer.distance) || 0,
+      delivery_fee: fee, subtotal, total,
+      items: cart as any,
+      payment_method: customer.payment,
+      change_for: customer.payment === "Dinheiro" && customer.change ? Number(customer.change.replace(/[^\d.,]/g, "").replace(",", ".")) || null : null,
+      order_type: orderType,
+      status: "pending",
+    });
+    setPlacing(false);
+    if (error) return flash("Erro ao registrar pedido. Tente novamente.");
+    setStep("success");
+  };
+
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <div className="app" style={themeVars(settings)}>
+      <header className="store-header">
+        <div className="cover-banner">
+          <img src={settings.cover_image_url || FALLBACK_IMG} alt="Nostra Casa" />
+          <div className="cover-overlay" />
+        </div>
+        <div className="store-header-info">
+          <div className="profile-circle"><img src={settings.profile_image_url || FALLBACK_IMG} alt="Logo Nostra Casa" /></div>
+          <h1 className="store-name">NOSTRA CASA</h1>
+          <p className="store-subtitle">Pizzaria &amp; Lanches</p>
+          <div className="store-contact-row">
+            <a href="https://wa.me/5543996309759" target="_blank" rel="noreferrer" className="store-whatsapp"><Phone size={14} /> (43) 99630-9759</a>
+            <span className="store-hours"><Clock3 size={14} /> Aberto até 03h</span>
+          </div>
+          <div className="store-header-actions">
+            {installEvent && <button className="install-btn" onClick={async () => { await installEvent.prompt(); setInstallEvent(null); }}><Download size={16} /> Instalar App</button>}
+            <a href="https://wa.me/5544997298450" target="_blank" rel="noreferrer" className="creator-link">Falar com criador do site</a>
+          </div>
+        </div>
+        <div className="search-bar">
+          <Search size={18} className="search-icon" />
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar no cardápio..." />
+        </div>
+        <div className="category-bar">
+          {categories.map((c) => { const Icon = categoryIcons[c] || UtensilsCrossed; return (
+            <button key={c} className={category === c ? "active" : ""} onClick={() => setCategory(c)}><Icon size={16} /><span>{c}</span></button>
+          ); })}
+        </div>
+      </header>
+
+      <main>
+        <section id="menu" className="menu-section">
+          <div className="section-heading">
+            <div><p className="eyebrow">Escolha o seu momento</p><h2>Cardápio da casa</h2></div>
+            <p className="address"><MapPin size={15} /> Avenida Inglaterra, 210<br />Londrina / PR</p>
+          </div>
+          <div className="product-list">
+            {loading && <p className="muted" style={{ textAlign: "center", padding: "40px 0" }}>Carregando cardápio...</p>}
+            {!loading && visibleProducts.length === 0 && <p className="muted" style={{ textAlign: "center", padding: "40px 0" }}>Nenhum produto encontrado.</p>}
+            {visibleProducts.map((p) => (
+              <article className="product-card-h" key={p.id}>
+                <div className="product-card-h-img">
+                  <img src={p.image_url || FALLBACK_IMG} alt={p.name} />
+                  {p.is_combo && <span className="tag">MAIS PEDIDO</span>}
+                </div>
+                <div className="product-card-h-body">
+                  <h3>{p.name}</h3>
+                  <p>{p.description}</p>
+                  {p.ingredients.length > 0 && <div className="ingredient-tags">{p.ingredients.map((ing, i) => <span key={i}>{ing}</span>)}</div>}
+                  <strong className="price">{money(p.price)}</strong>
+                </div>
+                <button className="add-btn-h" onClick={() => openProduct(p)} aria-label={`Adicionar ${p.name}`}><Plus size={18} /></button>
+              </article>
+            ))}
+          </div>
+        </section>
+        <section className="whatsapp-banner">
+          <div><p className="eyebrow">Sem tempo para escolher?</p><h2>Peça pelo WhatsApp</h2><p>Fale direto com a nossa equipe e receba novidades e promoções.</p></div>
+          <a href="https://wa.me/5543996309759" target="_blank" rel="noreferrer" className="whatsapp-btn">Abrir WhatsApp <ArrowRight size={18} /></a>
+        </section>
+      </main>
+      <footer>
+        <div className="brand"><div className="brand-mark">NC</div><div><strong>NOSTRA CASA</strong><span>PIZZARIA & LANCHES</span></div></div>
+        <p>Feito com carinho em Londrina · (43) 99630-9759 · <Link to="/admin" style={{ color: "inherit" }}>Área do dono</Link></p>
+      </footer>
+      <button className="cart-fab" onClick={() => setStep("checkout")}><ShoppingBag size={22} /><span>{cart.reduce((s, i) => s + i.quantity, 0)}</span></button>
+      {notice && <div className="toast">{notice}</div>}
+
+      {step === "combo" && selected && (
+        <div className="modal-backdrop"><div className="modal combo-modal">
+          <button className="close-btn" onClick={() => setStep("none")}><X size={20} /></button>
+          <div className="modal-kicker">Monte seu combo · Etapa {comboStep} de 3</div>
+          <h2>{comboStep === 1 ? "Escolha a sua borda" : comboStep === 2 ? "Escolha os sabores" : "Tudo certo por aqui?"}</h2>
+          {comboStep === 1 && <div className="choice-list">{["Borda Cheddar", "Borda Catupiry", "Sem Borda"].map((b) => <button className={border === b ? "choice selected" : "choice"} key={b} onClick={() => setBorder(b)}>{b}<span>{b === "Sem Borda" ? "Grátis" : "+ R$ 8,00"}</span></button>)}</div>}
+          {comboStep === 2 && <><p className="muted">Selecione até 2 sabores para a sua pizza.</p><div className="flavor-grid">{flavors.map((f) => <button key={f} className={selectedFlavors.includes(f) ? "flavor selected" : "flavor"} onClick={() => setSelectedFlavors((c) => c.includes(f) ? c.filter((x) => x !== f) : c.length < 2 ? [...c, f] : c)}>{f}</button>)}</div></>}
+          {comboStep === 3 && <div className="confirmation"><div className="confirm-icon">✓</div><p><strong>Guaraná 2L confirmado.</strong><br />Seu combo será preparado com {border.toLowerCase()} e {selectedFlavors.join(" + ")}.</p></div>}
+          <button className="primary-btn full" disabled={comboStep === 2 && selectedFlavors.length === 0} onClick={() => (comboStep < 3 ? setComboStep(comboStep + 1) : setUpsell(true))}>{comboStep < 3 ? "Continuar" : "Adicionar ao carrinho"} <ArrowRight size={18} /></button>
+        </div></div>
+      )}
+      {upsell && (
+        <div className="modal-backdrop"><div className="modal upsell">
+          <div className="dessert-art">●</div>
+          <div className="modal-kicker">Um toque doce?</div>
+          <h2>Gostaria de adicionar um Broto de Chocolate por R$ 10,00?</h2>
+          <div className="upsell-actions">
+            <button className="secondary-btn" onClick={() => finishCombo(false)}>Não, obrigado</button>
+            <button className="primary-btn" onClick={() => finishCombo(true)}>Sim, adicionar</button>
+          </div>
+        </div></div>
+      )}
+
+      {step === "checkout" && (
+        <div className="modal-backdrop"><div className="modal checkout">
+          <button className="close-btn" onClick={() => setStep("none")}><X size={20} /></button>
+          <div className="modal-kicker">Seu pedido</div>
+          <h2>{orderType === "pickup" ? "Retirada no balcão" : "Quase na sua casa."}</h2>
+          {cart.length === 0 ? <div className="empty"><ShoppingBag size={34} /><p>Seu carrinho ainda está vazio.</p><button className="primary-btn" onClick={() => setStep("none")}>Ver cardápio</button></div> : (
+            <>
+              <div className="cart-lines">
+                {cart.map((item) => <div className="cart-line" key={`${item.id}-${item.details}`}>
+                  <div><strong>{item.quantity}x {item.name}</strong><small>{item.details}</small></div>
+                  <div className="line-actions">
+                    <button onClick={() => setCart((c) => c.map((e) => (e === item ? { ...e, quantity: e.quantity - 1 } : e)).filter((e) => e.quantity > 0))}><Minus size={14} /></button>
+                    <span>{money(item.price * item.quantity)}</span>
+                    <button onClick={() => addToCart(item, item.details)}><Plus size={14} /></button>
+                  </div>
+                </div>)}
+              </div>
+              <div className="order-type-toggle">
+                <button className={orderType === "delivery" ? "active" : ""} onClick={() => setOrderType("delivery")}><Home size={18} /> Receber em Casa</button>
+                <button className={orderType === "pickup" ? "active" : ""} onClick={() => setOrderType("pickup")}><Store size={18} /> Retirar no Balcão</button>
+              </div>
+              <div className="form-grid">
+                <label>Nome completo<input value={customer.name} onChange={(e) => setCustomer({ ...customer, name: e.target.value })} placeholder="Como podemos te chamar?" /></label>
+                {orderType === "delivery" && <>
+                  <label>Endereço<input value={customer.address} onChange={(e) => setCustomer({ ...customer, address: e.target.value })} placeholder="Rua, avenida..." /></label>
+                  <label>Número<input value={customer.number} onChange={(e) => setCustomer({ ...customer, number: e.target.value })} placeholder="210" /></label>
+                  <label>Tipo<select value={customer.type} onChange={(e) => setCustomer({ ...customer, type: e.target.value })}><option>Casa</option><option>Apartamento</option></select></label>
+                  <label className="distance-field">Distância estimada (km)<div className="input-action"><input value={customer.distance} onChange={(e) => setCustomer({ ...customer, distance: e.target.value })} /><button onClick={locate}><LocateFixed size={17} /></button></div></label>
+                </>}
+                {orderType === "pickup" && <p className="payment-info">Retirada na loja: Avenida Inglaterra, 210 - Londrina/PR. Sem taxa de entrega.</p>}
+                <label>Pagamento<select value={customer.payment} onChange={(e) => setCustomer({ ...customer, payment: e.target.value, change: "" })}><option>Dinheiro</option><option>Cartão</option><option>Pix</option></select></label>
+                {customer.payment === "Dinheiro" && <label>Troco para<input value={customer.change} onChange={(e) => setCustomer({ ...customer, change: e.target.value })} placeholder="100" /></label>}
+                {customer.payment === "Cartão" && <p className="payment-info">Pagamento na maquininha {orderType === "pickup" ? "no caixa da loja" : "na entrega"}.</p>}
+                {customer.payment === "Pix" && <p className="payment-info">Pix feito na hora {orderType === "pickup" ? "no caixa da loja" : "na maquininha do entregador"}.</p>}
+              </div>
+              <div className="total-box">
+                <div><span>Subtotal</span><strong>{money(subtotal)}</strong></div>
+                <div><span>{orderType === "pickup" ? "Entrega" : `Entrega · ${customer.distance || 0} km`}</span><strong>{orderType === "pickup" ? "Grátis" : fee ? money(fee) : "A consultar"}</strong></div>
+                <div className="total"><span>Total</span><strong>{money(total)}</strong></div>
+              </div>
+              <button className="primary-btn full" disabled={placing} onClick={placeOrder}>{placing ? "Enviando..." : "Finalizar pedido"} <ArrowRight size={18} /></button>
+            </>
+          )}
+        </div></div>
+      )}
+
+      {step === "success" && (
+        <div className="modal-backdrop"><div className="modal success">
+          <div className="success-icon">✓</div>
+          <div className="modal-kicker">Pedido recebido</div>
+          <h2>{orderType === "pickup" ? "Pronto para retirada." : "Agora é só aguardar."}</h2>
+          <p>Seu pedido foi registrado. Envie os detalhes pelo WhatsApp para confirmar com a nossa equipe.</p>
+          <button className="primary-btn full" onClick={() => { sendWhatsApp(); setCart([]); setStep("none"); }}>Enviar no WhatsApp <ArrowRight size={18} /></button>
+        </div></div>
+      )}
     </div>
   );
 }
