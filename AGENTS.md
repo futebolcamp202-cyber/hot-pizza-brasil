@@ -8,3 +8,6 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Store data (products, settings, orders) lives in Lovable Cloud; admin writes gated by user_roles admin role (first signup becomes admin) — keeps owner-only edits server-enforced.
+- Images go to private "images" bucket; stored as 20-year signed URLs — workspace blocks public buckets.
