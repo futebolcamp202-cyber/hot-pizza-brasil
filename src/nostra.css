@@ -282,3 +282,5 @@ footer p { color: #716b63; font-size: 11px; }
   .order-type-toggle button { font-size: 11px; padding: 12px 8px; }
   .cart-fab { width: 50px; height: 50px; bottom: 16px; right: 16px; }
 }
+.admin-login-page { color: #f7f2e9; }
+.admin-login-card .link-btn { display: flex; }
