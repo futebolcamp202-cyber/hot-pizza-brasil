@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { CheckCircle2, ImagePlus, LogIn, LogOut, Pencil, Plus, Printer, Receipt, Save, Settings, ShoppingBag, Trash2, UserPlus, X, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { DEFAULT_SETTINGS, FALLBACK_IMG, fetchProducts, fetchSettings, money, themeVars, uploadImage, type OrderRow, type Product, type SettingsData } from "@/lib/store";
+import { DEFAULT_SETTINGS, FALLBACK_IMG, fetchProducts, fetchFlavors, fetchBorders, normName, type Flavor, type Border, fetchSettings, money, themeVars, uploadImage, type OrderRow, type Product, type SettingsData } from "@/lib/store";
 
 export const Route = createFileRoute("/admin")({
   ssr: false,

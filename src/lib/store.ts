@@ -45,7 +45,6 @@ export const DEFAULT_SETTINGS: SettingsData = {
 };
 export const FALLBACK_IMG =
   "https://images.pexels.com/photos/28945103/pexels-photo-28945103.jpeg?auto=compress&cs=tinysrgb&h=650&w=940";
-export const DEFAULT_FLAVORS = ["2 Queijos", "Alho crocante", "Bacon", "Calabresa sem cebola", "Calabresa acebolada", "Lombo com catupiry", "Lombo com cheddar", "Milho com bacon", "Margherita", "Mussarela", "Napolitana", "Palmito", "Frango catupiry", "Frango cheddar"];
 
 export function money(value: number) {
   return Number(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
