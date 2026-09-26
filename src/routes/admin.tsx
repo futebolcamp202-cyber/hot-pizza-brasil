@@ -21,13 +21,13 @@ export const Route = createFileRoute("/admin")({
   component: AdminPanel,
 });
 
-const EMPTY_PRODUCT: Product = { id: "", name: "", description: "", price: 0, image_url: "", category: "Pizzas", is_combo: false, ingredients: [], extras: [], available: true, sort_order: 0 };
+const EMPTY_PRODUCT: Product = { id: "", name: "", description: "", price: 0, image_url: "", category: "Pizzas", is_combo: false, requires_border: false, ingredients: [], extras: [], available: true, sort_order: 0 };
 
 function AdminPanel() {
   const [session, setSession] = useState<Session | null>(null);
   const [checked, setChecked] = useState(false);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [view, setView] = useState<"overview" | "orders" | "menu" | "settings">("overview");
+  const [view, setView] = useState<"overview" | "orders" | "menu" | "options" | "settings">("overview");
   const [products, setProducts] = useState<Product[]>([]);
   const [settings, setSettings] = useState<SettingsData>(DEFAULT_SETTINGS);
   const [orders, setOrders] = useState<OrderRow[]>([]);
@@ -62,7 +62,7 @@ function AdminPanel() {
 
   const saveProduct = async (p: Product) => {
     if (!p.name.trim()) return flash("Informe o nome do produto");
-    const payload = { name: p.name.trim(), description: p.description, price: Number(p.price) || 0, image_url: p.image_url || null, category: p.category || "Pizzas", is_combo: p.is_combo, ingredients: p.ingredients.filter(Boolean), extras: p.extras.filter(Boolean), available: p.available, sort_order: Number(p.sort_order) || 0 };
+    const payload = { name: p.name.trim(), description: p.description, price: Number(p.price) || 0, image_url: p.image_url || null, category: p.category || "Pizzas", is_combo: p.is_combo, requires_border: p.requires_border, ingredients: p.ingredients.filter(Boolean), extras: p.extras.filter(Boolean), available: p.available, sort_order: Number(p.sort_order) || 0 };
     const { error } = p.id ? await supabase.from("products").update(payload).eq("id", p.id) : await supabase.from("products").insert(payload);
     if (error) return flash("Erro ao salvar: " + error.message);
     setEditing(null); await loadMenu(); flash("Produto salvo");
@@ -121,7 +121,7 @@ function AdminPanel() {
       </header>
       <main className="admin-main">
         <div className="admin-tabs">
-          {([["overview", "Visão geral"], ["orders", "Pedidos"], ["menu", "Cardápio"], ["settings", "Fotos e configurações"]] as const).map(([k, l]) => (
+          {([["overview", "Visão geral"], ["orders", "Pedidos"], ["menu", "Cardápio"], ["options", "Sabores e bordas"], ["settings", "Fotos e configurações"]] as const).map(([k, l]) => (
             <button key={k} className={view === k ? "active" : ""} onClick={() => { setView(k); if (k === "orders") void loadOrders(); }}>{l}</button>
           ))}
         </div>
@@ -185,6 +185,7 @@ function AdminPanel() {
           </div>
         )}
 
+        {view === "options" && <OptionsManager onError={flash} onOk={flash} />}
         {view === "settings" && <SettingsForm key={settings.id} settings={settings} onSave={saveSettings} onError={flash} />}
       </main>
       {notice && <div className="toast">{notice}</div>}
@@ -292,7 +293,8 @@ function ProductForm({ product, onSave, onCancel, onError }: { product: Product;
       <datalist id="cats"><option value="Combos" /><option value="Pizzas" /><option value="Lanches" /><option value="Bebidas" /></datalist>
       <label>Ordem no cardápio<input type="number" value={f.sort_order} onChange={(e) => setF({ ...f, sort_order: Number(e.target.value) })} /></label>
       <ImageField label="Foto do produto" value={f.image_url} folder="products" onChange={(url) => setF({ ...f, image_url: url })} onError={onError} />
-      <label className="check-label"><input type="checkbox" checked={f.is_combo} onChange={(e) => setF({ ...f, is_combo: e.target.checked })} /> É um combo (cliente escolhe borda e sabores)</label>
+      <label className="check-label"><input type="checkbox" checked={f.is_combo} onChange={(e) => setF({ ...f, is_combo: e.target.checked })} /> É um combo (cliente escolhe sabores)</label>
+      <label className="check-label"><input type="checkbox" checked={f.requires_border} onChange={(e) => setF({ ...f, requires_border: e.target.checked })} /> Exigir Etapa de Borda</label>
       <label className="check-label"><input type="checkbox" checked={f.available} onChange={(e) => setF({ ...f, available: e.target.checked })} /> Mostrar na loja</label>
       <ListEditor title="Ingredientes" items={f.ingredients} onChange={(v) => setF({ ...f, ingredients: v })} placeholder="Novo ingrediente" />
       <ListEditor title="Adicionais / Extras" items={f.extras} onChange={(v) => setF({ ...f, extras: v })} placeholder="Novo adicional" />
@@ -326,6 +328,79 @@ function SettingsForm({ settings, onSave, onError }: { settings: SettingsData; o
         <textarea value={f.receipt_header} onChange={(e) => setF({ ...f, receipt_header: e.target.value })} rows={5} />
       </div>
       <button className="primary-btn full" disabled={saving} onClick={async () => { setSaving(true); await onSave(f); setSaving(false); }}><Save size={16} /> {saving ? "Salvando..." : "Salvar alterações"}</button>
+    </div>
+  );
+}
+
+function OptionsManager({ onError, onOk }: { onError: (m: string) => void; onOk: (m: string) => void }) {
+  const [flavors, setFlavors] = useState<Flavor[]>([]);
+  const [borders, setBorders] = useState<Border[]>([]);
+  const [newFlavor, setNewFlavor] = useState("");
+  const [nb, setNb] = useState({ name: "", price: "8" });
+  const load = async () => { try { const [f, b] = await Promise.all([fetchFlavors(), fetchBorders()]); setFlavors(f); setBorders(b); } catch (e: any) { onError(e.message); } };
+  useEffect(() => { void load(); }, []);
+  const addFlavor = async () => {
+    const name = newFlavor.trim().replace(/\s+/g, " ");
+    if (!name) return;
+    if (flavors.some((f) => normName(f.name) === normName(name))) return onError("Esse sabor já existe");
+    const { error } = await supabase.from("pizza_flavors").insert({ name });
+    if (error) return onError("Erro: " + error.message);
+    setNewFlavor(""); await load(); onOk("Sabor adicionado");
+  };
+  const delFlavor = async (f: Flavor) => {
+    if (!confirm(`Remover o sabor "${f.name}"?`)) return;
+    const { error } = await supabase.from("pizza_flavors").delete().eq("id", f.id);
+    if (error) return onError("Erro: " + error.message);
+    await load(); onOk("Sabor removido");
+  };
+  const addBorder = async () => {
+    if (!nb.name.trim()) return onError("Informe o nome da borda");
+    const { error } = await supabase.from("borders").insert({ name: nb.name.trim(), price: Number(nb.price.replace(",", ".")) || 0, sort_order: borders.length + 1 });
+    if (error) return onError("Erro: " + error.message);
+    setNb({ name: "", price: "8" }); await load(); onOk("Borda adicionada");
+  };
+  const saveBorder = async (b: Border) => {
+    const { error } = await supabase.from("borders").update({ name: b.name.trim(), price: Number(b.price) || 0 }).eq("id", b.id);
+    if (error) return onError("Erro: " + error.message);
+    await load(); onOk("Borda salva");
+  };
+  const delBorder = async (b: Border) => {
+    if (!confirm(`Remover "${b.name}"?`)) return;
+    const { error } = await supabase.from("borders").delete().eq("id", b.id);
+    if (error) return onError("Erro: " + error.message);
+    await load(); onOk("Borda removida");
+  };
+  return (
+    <div className="admin-menu">
+      <div className="product-form">
+        <h3>Sabores de Pizza ({flavors.length})</h3>
+        <div className="form-actions">
+          <input value={newFlavor} placeholder="Novo sabor" onChange={(e) => setNewFlavor(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addFlavor()} />
+          <button className="primary-btn" onClick={addFlavor}><Plus size={16} /> Adicionar</button>
+        </div>
+        {flavors.map((f) => (
+          <div className="menu-item" key={f.id}>
+            <div className="menu-item-body"><strong>{f.name}</strong></div>
+            <div className="menu-item-actions"><button title="Remover" onClick={() => delFlavor(f)}><Trash2 size={15} /></button></div>
+          </div>
+        ))}
+      </div>
+      <div className="product-form">
+        <h3>Bordas</h3>
+        {borders.map((b, i) => (
+          <div className="form-actions" key={b.id}>
+            <input value={b.name} onChange={(e) => setBorders(borders.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />
+            <input type="number" step="0.01" min="0" style={{ maxWidth: 110 }} value={b.price} onChange={(e) => setBorders(borders.map((x, j) => j === i ? { ...x, price: Number(e.target.value) } : x))} />
+            <button className="secondary-btn" title="Salvar" onClick={() => saveBorder(b)}><Save size={15} /></button>
+            <button className="secondary-btn" title="Remover" onClick={() => delBorder(b)}><Trash2 size={15} /></button>
+          </div>
+        ))}
+        <div className="form-actions">
+          <input value={nb.name} placeholder="Nova borda (ex: Borda Chocolate)" onChange={(e) => setNb({ ...nb, name: e.target.value })} />
+          <input type="number" step="0.01" min="0" style={{ maxWidth: 110 }} value={nb.price} placeholder="Valor" onChange={(e) => setNb({ ...nb, price: e.target.value })} />
+          <button className="primary-btn" onClick={addBorder}><Plus size={16} /> Adicionar</button>
+        </div>
+      </div>
     </div>
   );
 }
