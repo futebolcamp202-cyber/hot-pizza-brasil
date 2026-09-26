@@ -37,6 +37,9 @@ function Storefront() {
   const [selectedFlavors, setSelectedFlavors] = useState<string[]>([]);
   const [upsell, setUpsell] = useState(false);
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
+  const [showInstall, setShowInstall] = useState(false);
+  const [installOs, setInstallOs] = useState<"android" | "ios">("android");
+  useEffect(() => { if (/iphone|ipad|ipod/i.test(navigator.userAgent)) setInstallOs("ios"); }, []);
   const [orderType, setOrderType] = useState<"delivery" | "pickup">("delivery");
   const [customer, setCustomer] = useState({ name: "", address: "", number: "", type: "Casa", payment: "Dinheiro", change: "", distance: "4" });
   const [notice, setNotice] = useState("");
@@ -162,7 +165,7 @@ function Storefront() {
             <span className="store-hours"><Clock3 size={14} /> Aberto até 03h</span>
           </div>
           <div className="store-header-actions">
-            {installEvent && <button className="install-btn" onClick={async () => { await installEvent.prompt(); setInstallEvent(null); }}><Download size={16} /> Instalar App</button>}
+            <button className="install-btn install-btn-yellow" onClick={() => setShowInstall(true)}><Download size={16} /> Instalar App</button>
             <a href="https://wa.me/5544997298450" target="_blank" rel="noreferrer" className="creator-link">Falar com criador do site</a>
           </div>
         </div>
@@ -214,6 +217,33 @@ function Storefront() {
       </footer>
       <button className="cart-fab" onClick={() => setStep("checkout")}><ShoppingBag size={22} /><span>{cart.reduce((s, i) => s + i.quantity, 0)}</span></button>
       {notice && <div className="toast">{notice}</div>}
+
+      {showInstall && (
+        <div className="modal-backdrop" onClick={() => setShowInstall(false)}><div className="modal install-modal" onClick={(e) => e.stopPropagation()}>
+          <button className="close-btn" onClick={() => setShowInstall(false)}><X size={20} /></button>
+          <div className="modal-kicker">Instalar App</div>
+          <h2>Tenha a Nostra Casa na sua tela inicial</h2>
+          {installEvent && <button className="primary-btn full install-btn-yellow" onClick={async () => { await installEvent.prompt(); setInstallEvent(null); setShowInstall(false); }}><Download size={18} /> Instalar agora</button>}
+          <div className="install-tabs">
+            <button className={installOs === "android" ? "active" : ""} onClick={() => setInstallOs("android")}>Android / Chrome</button>
+            <button className={installOs === "ios" ? "active" : ""} onClick={() => setInstallOs("ios")}>iPhone / Safari</button>
+          </div>
+          {installOs === "android" ? (
+            <ol className="install-steps">
+              <li><span className="install-num">1</span><div><strong>Abra o menu do Chrome</strong><p>Toque nos <b>três pontinhos ⋮</b> no canto superior direito.</p></div></li>
+              <li><span className="install-num">2</span><div><strong>Instalar aplicativo</strong><p>Toque em <b>"Instalar aplicativo"</b> ou <b>"Adicionar à tela inicial"</b>.</p></div></li>
+              <li><span className="install-num">3</span><div><strong>Confirme</strong><p>Toque em <b>"Instalar"</b>. O ícone da Nostra Casa aparecerá na sua tela.</p></div></li>
+            </ol>
+          ) : (
+            <ol className="install-steps">
+              <li><span className="install-num">1</span><div><strong>Abra no Safari</strong><p>Toque no botão <b>Compartilhar</b> (quadrado com seta ↑) na barra inferior.</p></div></li>
+              <li><span className="install-num">2</span><div><strong>Adicionar à Tela de Início</strong><p>Role a lista e toque em <b>"Adicionar à Tela de Início"</b>.</p></div></li>
+              <li><span className="install-num">3</span><div><strong>Confirme</strong><p>Toque em <b>"Adicionar"</b> no canto superior direito.</p></div></li>
+            </ol>
+          )}
+          <button className="secondary-btn full" onClick={() => setShowInstall(false)}>Entendi</button>
+        </div></div>
+      )}
 
       {step === "combo" && selected && (
         <div className="modal-backdrop"><div className="modal combo-modal">
