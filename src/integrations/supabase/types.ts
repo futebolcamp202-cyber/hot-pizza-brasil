@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      borders: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          price: number
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          price?: number
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          price?: number
+          sort_order?: number
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           address: string
@@ -68,6 +92,24 @@ export type Database = {
         }
         Relationships: []
       }
+      pizza_flavors: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           available: boolean
@@ -81,6 +123,7 @@ export type Database = {
           is_combo: boolean
           name: string
           price: number
+          requires_border: boolean
           sort_order: number
         }
         Insert: {
@@ -95,6 +138,7 @@ export type Database = {
           is_combo?: boolean
           name: string
           price?: number
+          requires_border?: boolean
           sort_order?: number
         }
         Update: {
@@ -109,6 +153,7 @@ export type Database = {
           is_combo?: boolean
           name?: string
           price?: number
+          requires_border?: boolean
           sort_order?: number
         }
         Relationships: []

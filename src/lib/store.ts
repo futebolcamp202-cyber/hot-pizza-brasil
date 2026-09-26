@@ -12,7 +12,10 @@ export type Product = {
   extras: string[];
   available: boolean;
   sort_order: number;
+  requires_border: boolean;
 };
+export type Flavor = { id: string; name: string };
+export type Border = { id: string; name: string; price: number; sort_order: number };
 export type CartItem = Product & { quantity: number; details?: string };
 export type SettingsData = {
   id: string;
@@ -42,7 +45,6 @@ export const DEFAULT_SETTINGS: SettingsData = {
 };
 export const FALLBACK_IMG =
   "https://images.pexels.com/photos/28945103/pexels-photo-28945103.jpeg?auto=compress&cs=tinysrgb&h=650&w=940";
-export const DEFAULT_FLAVORS = ["2 Queijos", "Alho crocante", "Bacon", "Calabresa sem cebola", "Calabresa acebolada", "Lombo com catupiry", "Lombo com cheddar", "Milho com bacon", "Margherita", "Mussarela", "Napolitana", "Palmito", "Frango catupiry", "Frango cheddar"];
 
 export function money(value: number) {
   return Number(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -55,7 +57,7 @@ export function deliveryFee(distance: number) {
   return 0;
 }
 export function normalizeProduct(p: any): Product {
-  return { ...p, price: Number(p.price), ingredients: p.ingredients ?? [], extras: p.extras ?? [] };
+  return { ...p, requires_border: !!p.requires_border, price: Number(p.price), ingredients: p.ingredients ?? [], extras: p.extras ?? [] };
 }
 
 export async function fetchProducts(onlyAvailable: boolean) {
@@ -83,4 +85,20 @@ export async function uploadImage(file: File, folder: string) {
 
 export function themeVars(s: SettingsData) {
   return { "--primary": s.primary_color, "--button": s.button_color, "--page": s.background_color } as React.CSSProperties;
+}
+
+export const normName = (n: string) => n.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase().replace(/\s+/g, " ");
+export function dedupeFlavors<T extends { name: string }>(list: T[]) {
+  const seen = new Set<string>();
+  return list.filter((f) => { const k = normName(f.name); if (!k || seen.has(k)) return false; seen.add(k); return true; });
+}
+export async function fetchFlavors(): Promise<Flavor[]> {
+  const { data, error } = await supabase.from("pizza_flavors").select("id,name").order("name");
+  if (error) throw error;
+  return dedupeFlavors(data ?? []);
+}
+export async function fetchBorders(): Promise<Border[]> {
+  const { data, error } = await supabase.from("borders").select("*").order("sort_order").order("created_at");
+  if (error) throw error;
+  return (data ?? []).map((b: any) => ({ id: b.id, name: b.name, price: Number(b.price), sort_order: b.sort_order }));
 }
