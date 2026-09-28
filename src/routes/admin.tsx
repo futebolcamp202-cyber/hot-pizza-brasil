@@ -21,7 +21,7 @@ export const Route = createFileRoute("/admin")({
   component: AdminPanel,
 });
 
-const EMPTY_PRODUCT: Product = { id: "", name: "", description: "", price: 0, image_url: "", category: "Pizzas", is_combo: false, requires_border: false, allow_two_flavors: false, ingredients: [], extras: [], available: true, sort_order: 0 };
+const EMPTY_PRODUCT: Product = { id: "", name: "", description: "", price: 0, image_url: "", category: "Pizzas", is_combo: false, requires_border: false, allow_two_flavors: false, combo_flavors_step: false, ingredients: [], extras: [], available: true, sort_order: 0 };
 
 function AdminPanel() {
   const [session, setSession] = useState<Session | null>(null);
@@ -62,7 +62,7 @@ function AdminPanel() {
 
   const saveProduct = async (p: Product) => {
     if (!p.name.trim()) return flash("Informe o nome do produto");
-    const payload = { name: p.name.trim(), description: p.description, price: Number(p.price) || 0, image_url: p.image_url || null, category: p.category || "Pizzas", is_combo: p.is_combo, requires_border: p.requires_border, allow_two_flavors: p.allow_two_flavors, ingredients: p.ingredients.filter(Boolean), extras: p.extras.filter(Boolean), available: p.available, sort_order: Number(p.sort_order) || 0 };
+    const payload = { name: p.name.trim(), description: p.description, price: Number(p.price) || 0, image_url: p.image_url || null, category: p.category || "Pizzas", is_combo: p.is_combo, requires_border: p.requires_border, allow_two_flavors: p.allow_two_flavors, combo_flavors_step: p.combo_flavors_step, ingredients: p.ingredients.filter(Boolean), extras: p.extras.filter(Boolean), available: p.available, sort_order: Number(p.sort_order) || 0 };
     const { error } = p.id ? await supabase.from("products").update(payload).eq("id", p.id) : await supabase.from("products").insert(payload);
     if (error) return flash("Erro ao salvar: " + error.message);
     setEditing(null); await loadMenu(); flash("Produto salvo");
@@ -296,6 +296,7 @@ function ProductForm({ product, onSave, onCancel, onError }: { product: Product;
       <label className="check-label"><input type="checkbox" checked={f.is_combo} onChange={(e) => setF({ ...f, is_combo: e.target.checked })} /> É um combo (cliente escolhe sabores)</label>
       <label className="check-label"><input type="checkbox" checked={f.requires_border} onChange={(e) => setF({ ...f, requires_border: e.target.checked })} /> Exigir Etapa de Borda</label>
       <label className="check-label"><input type="checkbox" checked={f.allow_two_flavors} onChange={(e) => setF({ ...f, allow_two_flavors: e.target.checked })} /> Ativar etapa de escolha de até 2 sabores neste produto</label>
+      <label className="check-label"><input type="checkbox" checked={f.combo_flavors_step} onChange={(e) => setF({ ...f, combo_flavors_step: e.target.checked })} /> Ativar Etapa - Sabores do Combo (Até 2 sabores)</label>
       <label className="check-label"><input type="checkbox" checked={f.available} onChange={(e) => setF({ ...f, available: e.target.checked })} /> Mostrar na loja</label>
       <ListEditor title="Ingredientes" items={f.ingredients} onChange={(v) => setF({ ...f, ingredients: v })} placeholder="Novo ingrediente" />
       <ListEditor title="Adicionais / Extras" items={f.extras} onChange={(v) => setF({ ...f, extras: v })} placeholder="Novo adicional" />

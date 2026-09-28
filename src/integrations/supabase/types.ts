@@ -118,6 +118,7 @@ export type Database = {
           allow_two_flavors: boolean
           available: boolean
           category: string
+          combo_flavors_step: boolean
           created_at: string
           description: string
           extras: string[]
@@ -134,6 +135,7 @@ export type Database = {
           allow_two_flavors?: boolean
           available?: boolean
           category?: string
+          combo_flavors_step?: boolean
           created_at?: string
           description?: string
           extras?: string[]
@@ -150,6 +152,7 @@ export type Database = {
           allow_two_flavors?: boolean
           available?: boolean
           category?: string
+          combo_flavors_step?: boolean
           created_at?: string
           description?: string
           extras?: string[]

@@ -14,6 +14,7 @@ export type Product = {
   sort_order: number;
   requires_border: boolean;
   allow_two_flavors: boolean;
+  combo_flavors_step: boolean;
 };
 export type Flavor = { id: string; name: string; description?: string };
 export type Border = { id: string; name: string; price: number; sort_order: number };
@@ -58,7 +59,7 @@ export function deliveryFee(distance: number) {
   return 0;
 }
 export function normalizeProduct(p: any): Product {
-  return { ...p, requires_border: !!p.requires_border, allow_two_flavors: !!p.allow_two_flavors, price: Number(p.price), ingredients: p.ingredients ?? [], extras: p.extras ?? [] };
+  return { ...p, requires_border: !!p.requires_border, allow_two_flavors: !!p.allow_two_flavors, combo_flavors_step: !!p.combo_flavors_step, price: Number(p.price), ingredients: p.ingredients ?? [], extras: p.extras ?? [] };
 }
 
 export async function fetchProducts(onlyAvailable: boolean) {
@@ -103,3 +104,21 @@ export async function fetchBorders(): Promise<Border[]> {
   if (error) throw error;
   return (data ?? []).map((b: any) => ({ id: b.id, name: b.name, price: Number(b.price), sort_order: b.sort_order }));
 }
+
+/** Lista fixa da etapa "Sabores do Combo (Até 2 sabores)". */
+export const COMBO_FLAVORS: Flavor[] = ([
+  ["2 Queijos", "Molho de tomate, mussarela, provolone e orégano"],
+  ["Bacon", "Molho de tomate, mussarela, bacon e orégano"],
+  ["Alho Crocante", "Molho de tomate, mussarela, alho frito e orégano"],
+  ["Calabresa Acebolada", "Molho de tomate, mussarela, calabresa, cebola e orégano"],
+  ["Calabresa sem Cebola", "Molho de tomate, mussarela, calabresa e orégano"],
+  ["Lombo Catupiry", "Molho de tomate, mussarela, lombo fatiado, catupiry e orégano"],
+  ["Lombo com Cheddar", "Molho de tomate, mussarela, lombo fatiado, cheddar e orégano"],
+  ["Milho com Bacon", "Molho de tomate, mussarela, milho, bacon e orégano"],
+  ["Marguerita", "Molho de tomate, mussarela, rodelas de tomate e orégano"],
+  ["Mussarela", "Molho de tomate, mussarela e orégano"],
+  ["Napolitana", "Molho de tomate, presunto, tomate, mussarela e orégano"],
+  ["Palmito", "Molho de tomate, mussarela, palmito, catupiry e orégano"],
+  ["Frango com Cheddar", "Molho de tomate, frango, cheddar, mussarela e orégano"],
+  ["Frango com Catupiry", "Molho de tomate, frango, requeijão tipo catupiry, mussarela e orégano"],
+] as [string, string][]).map(([name, description], i) => ({ id: `combo-${i}`, name, description }));
