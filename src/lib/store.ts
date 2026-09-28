@@ -106,7 +106,7 @@ export async function fetchBorders(): Promise<Border[]> {
 }
 
 /** Lista fixa da etapa "Sabores do Combo (Até 2 sabores)". */
-export const COMBO_FLAVORS: Flavor[] = [
+export const COMBO_FLAVORS: Flavor[] = ([
   ["2 Queijos", "Molho de tomate, mussarela, provolone e orégano"],
   ["Bacon", "Molho de tomate, mussarela, bacon e orégano"],
   ["Alho Crocante", "Molho de tomate, mussarela, alho frito e orégano"],
@@ -121,4 +121,4 @@ export const COMBO_FLAVORS: Flavor[] = [
   ["Palmito", "Molho de tomate, mussarela, palmito, catupiry e orégano"],
   ["Frango com Cheddar", "Molho de tomate, frango, cheddar, mussarela e orégano"],
   ["Frango com Catupiry", "Molho de tomate, frango, requeijão tipo catupiry, mussarela e orégano"],
-].map(([name, description], i) => ({ id: `combo-${i}`, name, description }));
+] as [string, string][]).map(([name, description], i) => ({ id: `combo-${i}`, name, description }));
