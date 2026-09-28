@@ -95,16 +95,19 @@ export type Database = {
       pizza_flavors: {
         Row: {
           created_at: string
+          description: string
           id: string
           name: string
         }
         Insert: {
           created_at?: string
+          description?: string
           id?: string
           name: string
         }
         Update: {
           created_at?: string
+          description?: string
           id?: string
           name?: string
         }
@@ -112,6 +115,7 @@ export type Database = {
       }
       products: {
         Row: {
+          allow_two_flavors: boolean
           available: boolean
           category: string
           created_at: string
@@ -127,6 +131,7 @@ export type Database = {
           sort_order: number
         }
         Insert: {
+          allow_two_flavors?: boolean
           available?: boolean
           category?: string
           created_at?: string
@@ -142,6 +147,7 @@ export type Database = {
           sort_order?: number
         }
         Update: {
+          allow_two_flavors?: boolean
           available?: boolean
           category?: string
           created_at?: string
