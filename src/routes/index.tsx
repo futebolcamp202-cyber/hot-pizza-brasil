@@ -72,11 +72,13 @@ function Storefront() {
 
   const categories = ["Todos", ...Array.from(new Set(products.map((p) => p.category)))];
   const flavors = useMemo(() => dedupeFlavors(flavorList).map((f) => f.name), [flavorList]);
+  const flavorDesc = useMemo(() => Object.fromEntries(flavorList.map((f) => [f.name, f.description ?? ""])), [flavorList]);
   const comboSteps = useMemo(() => {
     if (!selected) return [] as ("border" | "flavors" | "confirm")[];
     const st: ("border" | "flavors" | "confirm")[] = [];
     if (selected.requires_border && borders.length) st.push("border");
     if (selected.is_combo) st.push("flavors", "confirm");
+    else if (selected.allow_two_flavors) st.push("flavors");
     return st;
   }, [selected, borders.length]);
   const curStep = comboSteps[comboStep - 1];
@@ -96,14 +98,14 @@ function Storefront() {
     flash("Adicionado ao carrinho");
   };
   const openProduct = (p: Product) => {
-    if (p.is_combo || (p.requires_border && borders.length)) { setSelected(p); setComboStep(1); setSelectedFlavors([]); setBorder(borders[0]?.name ?? ""); setStep("combo"); }
+    if (p.is_combo || p.allow_two_flavors || (p.requires_border && borders.length)) { setSelected(p); setComboStep(1); setSelectedFlavors([]); setBorder(borders[0]?.name ?? ""); setStep("combo"); }
     else addToCart(p);
   };
   const finishCombo = (withDessert: boolean) => {
     if (!selected) return;
     const hasBorder = comboSteps.includes("border");
     const borderPrice = hasBorder ? borderObj?.price ?? 0 : 0;
-    const parts = [hasBorder ? border : "", selected.is_combo ? selectedFlavors.join(" + ") : "", selected.is_combo ? "Guaraná 2L" : "", withDessert ? "Broto de Chocolate" : ""].filter(Boolean);
+    const parts = [hasBorder ? border : "", comboSteps.includes("flavors") ? selectedFlavors.join(" + ") : "", selected.is_combo ? "Guaraná 2L" : "", withDessert ? "Broto de Chocolate" : ""].filter(Boolean);
     const details = parts.join(" · ");
     addToCart({ ...selected, price: selected.price + borderPrice + (withDessert ? 10 : 0) }, details);
     setStep("none"); setUpsell(false);
@@ -251,9 +253,9 @@ function Storefront() {
           <div className="modal-kicker">Monte seu combo · Etapa {comboStep} de {comboSteps.length}</div>
           <h2>{curStep === "border" ? "Escolha a sua borda" : curStep === "flavors" ? "Escolha os sabores" : "Tudo certo por aqui?"}</h2>
           {curStep === "border" && <div className="choice-list">{borders.map((b) => <button className={border === b.name ? "choice selected" : "choice"} key={b.id} onClick={() => setBorder(b.name)}>{b.name}<span>{b.price ? `+ ${money(b.price)}` : "Grátis"}</span></button>)}</div>}
-          {curStep === "flavors" && <><p className="muted">Selecione até 2 sabores para a sua pizza.</p><div className="flavor-grid">{flavors.map((f) => <button key={f} className={selectedFlavors.includes(f) ? "flavor selected" : "flavor"} onClick={() => setSelectedFlavors((c) => c.includes(f) ? c.filter((x) => x !== f) : c.length < 2 ? [...c, f] : c)}>{f}</button>)}</div></>}
+          {curStep === "flavors" && <><p className="muted">Selecione até 2 sabores para a sua pizza.</p><div className="flavor-grid">{flavors.map((f) => <button key={f} className={selectedFlavors.includes(f) ? "flavor selected" : "flavor"} onClick={() => setSelectedFlavors((c) => { if (c.includes(f)) return c.filter((x) => x !== f); if (c.length >= 2) { flash("Máximo de 2 sabores. Desmarque um antes."); return c; } return [...c, f]; })}>{f}{flavorDesc[f] && <small style={{ display: "block", opacity: 0.7, fontWeight: 400, fontSize: 11, marginTop: 2 }}>{flavorDesc[f]}</small>}</button>)}</div></>}
           {curStep === "confirm" && <div className="confirmation"><div className="confirm-icon">✓</div><p><strong>Guaraná 2L confirmado.</strong><br />Seu combo será preparado{comboSteps.includes("border") ? ` com ${border.toLowerCase()}` : ""} com {selectedFlavors.join(" + ")}.</p></div>}
-          <button className="primary-btn full" disabled={(curStep === "flavors" && selectedFlavors.length === 0) || (curStep === "border" && !border)} onClick={() => (comboStep < comboSteps.length ? setComboStep(comboStep + 1) : selected?.is_combo ? setUpsell(true) : finishCombo(false))}>{comboStep < comboSteps.length ? "Continuar" : "Adicionar ao carrinho"} <ArrowRight size={18} /></button>
+          <button className="primary-btn full" disabled={(curStep === "flavors" && selectedFlavors.length === 0) || (curStep === "border" && !border)} onClick={() => (comboStep < comboSteps.length ? setComboStep(comboStep + 1) : selected?.is_combo ? setUpsell(true) : finishCombo(false))}>{comboStep < comboSteps.length || curStep === "flavors" ? "Continuar" : "Adicionar ao carrinho"} <ArrowRight size={18} /></button>
         </div></div>
       )}
       {upsell && (

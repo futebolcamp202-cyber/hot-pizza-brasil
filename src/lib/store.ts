@@ -13,8 +13,9 @@ export type Product = {
   available: boolean;
   sort_order: number;
   requires_border: boolean;
+  allow_two_flavors: boolean;
 };
-export type Flavor = { id: string; name: string };
+export type Flavor = { id: string; name: string; description?: string };
 export type Border = { id: string; name: string; price: number; sort_order: number };
 export type CartItem = Product & { quantity: number; details?: string };
 export type SettingsData = {
@@ -57,7 +58,7 @@ export function deliveryFee(distance: number) {
   return 0;
 }
 export function normalizeProduct(p: any): Product {
-  return { ...p, requires_border: !!p.requires_border, price: Number(p.price), ingredients: p.ingredients ?? [], extras: p.extras ?? [] };
+  return { ...p, requires_border: !!p.requires_border, allow_two_flavors: !!p.allow_two_flavors, price: Number(p.price), ingredients: p.ingredients ?? [], extras: p.extras ?? [] };
 }
 
 export async function fetchProducts(onlyAvailable: boolean) {
@@ -93,7 +94,7 @@ export function dedupeFlavors<T extends { name: string }>(list: T[]) {
   return list.filter((f) => { const k = normName(f.name); if (!k || seen.has(k)) return false; seen.add(k); return true; });
 }
 export async function fetchFlavors(): Promise<Flavor[]> {
-  const { data, error } = await supabase.from("pizza_flavors").select("id,name").order("name");
+  const { data, error } = await supabase.from("pizza_flavors").select("id,name,description").order("name");
   if (error) throw error;
   return dedupeFlavors(data ?? []);
 }
