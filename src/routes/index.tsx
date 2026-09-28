@@ -167,7 +167,7 @@ function Storefront() {
             <span className="store-hours"><Clock3 size={14} /> Aberto até 03h</span>
           </div>
           <div className="store-header-actions">
-            <button className="install-btn install-btn-yellow" onClick={() => setShowInstall(true)}><Download size={16} /> Instalar App</button>
+            <button className="install-btn install-btn-yellow" onClick={async () => { if (installEvent) { await installEvent.prompt(); setInstallEvent(null); } else { setShowInstall(true); } }}><Download size={16} /> Instalar App</button>
             <a href="https://wa.me/5544997298450" target="_blank" rel="noreferrer" className="creator-link">Falar com criador do site</a>
           </div>
         </div>
@@ -225,22 +225,17 @@ function Storefront() {
           <button className="close-btn" onClick={() => setShowInstall(false)}><X size={20} /></button>
           <div className="modal-kicker">Instalar App</div>
           <h2>Tenha a Nostra Casa na sua tela inicial</h2>
-          {installEvent && <button className="primary-btn full install-btn-yellow" onClick={async () => { await installEvent.prompt(); setInstallEvent(null); setShowInstall(false); }}><Download size={18} /> Instalar agora</button>}
-          <div className="install-tabs">
-            <button className={installOs === "android" ? "active" : ""} onClick={() => setInstallOs("android")}>Android / Chrome</button>
-            <button className={installOs === "ios" ? "active" : ""} onClick={() => setInstallOs("ios")}>iPhone / Safari</button>
-          </div>
-          {installOs === "android" ? (
-            <ol className="install-steps">
-              <li><span className="install-num">1</span><div><strong>Abra o menu do Chrome</strong><p>Toque nos <b>três pontinhos ⋮</b> no canto superior direito.</p></div></li>
-              <li><span className="install-num">2</span><div><strong>Instalar aplicativo</strong><p>Toque em <b>"Instalar aplicativo"</b> ou <b>"Adicionar à tela inicial"</b>.</p></div></li>
-              <li><span className="install-num">3</span><div><strong>Confirme</strong><p>Toque em <b>"Instalar"</b>. O ícone da Nostra Casa aparecerá na sua tela.</p></div></li>
-            </ol>
-          ) : (
+          {installOs === "ios" ? (
             <ol className="install-steps">
               <li><span className="install-num">1</span><div><strong>Abra no Safari</strong><p>Toque no botão <b>Compartilhar</b> (quadrado com seta ↑) na barra inferior.</p></div></li>
               <li><span className="install-num">2</span><div><strong>Adicionar à Tela de Início</strong><p>Role a lista e toque em <b>"Adicionar à Tela de Início"</b>.</p></div></li>
               <li><span className="install-num">3</span><div><strong>Confirme</strong><p>Toque em <b>"Adicionar"</b> no canto superior direito.</p></div></li>
+            </ol>
+          ) : (
+            <ol className="install-steps">
+              <li><span className="install-num">1</span><div><strong>Abra o menu do Chrome</strong><p>Toque nos <b>três pontinhos ⋮</b> no canto superior direito.</p></div></li>
+              <li><span className="install-num">2</span><div><strong>Instalar aplicativo</strong><p>Toque em <b>"Instalar aplicativo"</b> ou <b>"Adicionar à tela inicial"</b>.</p></div></li>
+              <li><span className="install-num">3</span><div><strong>Confirme</strong><p>Toque em <b>"Instalar"</b>. O ícone da Nostra Casa aparecerá na sua tela.</p></div></li>
             </ol>
           )}
           <button className="secondary-btn full" onClick={() => setShowInstall(false)}>Entendi</button>
