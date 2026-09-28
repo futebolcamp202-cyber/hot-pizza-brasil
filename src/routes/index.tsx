@@ -71,14 +71,15 @@ function Storefront() {
   function flash(msg: string) { setNotice(msg); setTimeout(() => setNotice(""), 2200); }
 
   const categories = ["Todos", ...Array.from(new Set(products.map((p) => p.category)))];
-  const flavors = useMemo(() => dedupeFlavors(flavorList).map((f) => f.name), [flavorList]);
-  const flavorDesc = useMemo(() => Object.fromEntries(flavorList.map((f) => [f.name, f.description ?? ""])), [flavorList]);
+  const activeFlavorList = selected?.combo_flavors_step ? COMBO_FLAVORS : flavorList;
+  const flavors = useMemo(() => dedupeFlavors(activeFlavorList).map((f) => f.name), [activeFlavorList]);
+  const flavorDesc = useMemo(() => Object.fromEntries(activeFlavorList.map((f) => [f.name, f.description ?? ""])), [activeFlavorList]);
   const comboSteps = useMemo(() => {
     if (!selected) return [] as ("border" | "flavors" | "confirm")[];
     const st: ("border" | "flavors" | "confirm")[] = [];
     if (selected.requires_border && borders.length) st.push("border");
     if (selected.is_combo) st.push("flavors", "confirm");
-    else if (selected.allow_two_flavors) st.push("flavors");
+    else if (selected.allow_two_flavors || selected.combo_flavors_step) st.push("flavors");
     return st;
   }, [selected, borders.length]);
   const curStep = comboSteps[comboStep - 1];
