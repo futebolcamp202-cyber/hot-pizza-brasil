@@ -71,7 +71,7 @@ function Storefront() {
   function flash(msg: string) { setNotice(msg); setTimeout(() => setNotice(""), 2200); }
 
   const categories = ["Todos", ...Array.from(new Set(products.map((p) => p.category)))];
-  const activeFlavorList = selected?.combo_flavors_step ? COMBO_FLAVORS : flavorList;
+  const activeFlavorList = selected?.combo_flavors_step ? COMBO_FLAVORS : selected?.allow_two_flavors && !selected?.is_combo ? TWO_FLAVORS_LIST : flavorList;
   const flavors = useMemo(() => dedupeFlavors(activeFlavorList).map((f) => f.name), [activeFlavorList]);
   const flavorDesc = useMemo(() => Object.fromEntries(activeFlavorList.map((f) => [f.name, f.description ?? ""])), [activeFlavorList]);
   const comboSteps = useMemo(() => {
