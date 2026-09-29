@@ -51,14 +51,29 @@ function Storefront() {
       .catch(() => flash("Não foi possível carregar o cardápio"))
       .finally(() => setLoading(false));
     const loadOpts = () => { fetchFlavors().then(setFlavorList).catch(() => {}); fetchBorders().then(setBorders).catch(() => {}); };
+    const loadMenu = () => { fetchProducts(true).then(setProducts).catch(() => {}); };
+    const loadSettings = () => { fetchSettings().then(setSettings).catch(() => {}); };
+    const loadAll = () => { loadOpts(); loadMenu(); loadSettings(); };
     loadOpts();
     const ch = supabase.channel("menu-options")
       .on("postgres_changes", { event: "*", schema: "public", table: "pizza_flavors" }, loadOpts)
       .on("postgres_changes", { event: "*", schema: "public", table: "borders" }, loadOpts)
+      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, loadMenu)
+      .on("postgres_changes", { event: "*", schema: "public", table: "store_settings" }, loadSettings)
       .subscribe();
+    const onVisible = () => { if (document.visibilityState === "visible") loadAll(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", loadAll);
+    const poll = window.setInterval(loadAll, 30000);
     const handler = (e: Event) => { e.preventDefault(); setInstallEvent(e as BeforeInstallPromptEvent); };
     window.addEventListener("beforeinstallprompt", handler);
-    return () => { window.removeEventListener("beforeinstallprompt", handler); void supabase.removeChannel(ch); };
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", loadAll);
+      window.clearInterval(poll);
+      void supabase.removeChannel(ch);
+    };
   }, []);
 
   useEffect(() => {
