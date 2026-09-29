@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Clock3, Download, LocateFixed, MapPin, Minus, Plus, ShoppingBag, Sparkles, X, Search, Home, Store, Pizza, CupSoda, UtensilsCrossed, Phone, Truck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { COMBO_FLAVORS, DEFAULT_SETTINGS, dedupeFlavors, fetchBorders, fetchFlavors, type Border, type Flavor, FALLBACK_IMG, deliveryFee, fetchProducts, fetchSettings, money, themeVars, type CartItem, type Product, type SettingsData } from "@/lib/store";
+import { COMBO_FLAVORS, TWO_FLAVORS_LIST, DEFAULT_SETTINGS, dedupeFlavors, fetchBorders, fetchFlavors, type Border, type Flavor, FALLBACK_IMG, deliveryFee, fetchProducts, fetchSettings, money, themeVars, type CartItem, type Product, type SettingsData } from "@/lib/store";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -71,7 +71,7 @@ function Storefront() {
   function flash(msg: string) { setNotice(msg); setTimeout(() => setNotice(""), 2200); }
 
   const categories = ["Todos", ...Array.from(new Set(products.map((p) => p.category)))];
-  const activeFlavorList = selected?.combo_flavors_step ? COMBO_FLAVORS : flavorList;
+  const activeFlavorList = selected?.combo_flavors_step ? COMBO_FLAVORS : selected?.allow_two_flavors && !selected?.is_combo ? TWO_FLAVORS_LIST : flavorList;
   const flavors = useMemo(() => dedupeFlavors(activeFlavorList).map((f) => f.name), [activeFlavorList]);
   const flavorDesc = useMemo(() => Object.fromEntries(activeFlavorList.map((f) => [f.name, f.description ?? ""])), [activeFlavorList]);
   const comboSteps = useMemo(() => {
@@ -122,7 +122,7 @@ function Storefront() {
     }, () => flash("Não foi possível obter sua localização. Digite a distância."));
   };
   const sendWhatsApp = () => {
-    const lines = cart.map((i) => `${i.quantity}x ${i.name}${i.details ? ` (${i.details})` : ""} - ${money(i.price * i.quantity)}`).join("\n");
+    const lines = cart.map((i) => `• ${i.quantity}x ${i.name}${i.details ? `\n   Detalhes: ${i.details}` : ""}\n   Valor unitário: ${money(i.price)}\n   Valor do item: ${money(i.price * i.quantity)}`).join("\n\n");
     const paymentLabel = customer.payment === "Pix" ? "Pix (maquininha)" : customer.payment === "Dinheiro" ? `Dinheiro${customer.change ? ` (Troco para ${money(Number(customer.change))})` : ""}` : "Cartão (maquininha)";
     const info = orderType === "pickup"
       ? "*Retirada no Balcão*\nAv. Inglaterra, 210 - Londrina/PR"
