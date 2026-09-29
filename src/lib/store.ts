@@ -122,3 +122,8 @@ export const COMBO_FLAVORS: Flavor[] = ([
   ["Frango com Cheddar", "Molho de tomate, frango, cheddar, mussarela e orégano"],
   ["Frango com Catupiry", "Molho de tomate, frango, requeijão tipo catupiry, mussarela e orégano"],
 ] as [string, string][]).map(([name, description], i) => ({ id: `combo-${i}`, name, description }));
+
+/** Lista fixa da opção "Ativar etapa de escolha de até 2 sabores neste produto". */
+export const TWO_FLAVORS_LIST: Flavor[] = [
+  "2 Queijos","Alho Crocante","Bacon","Calabresa Sem Cebola","Calabresa Acebolada","Lombo com Catupiry","Lombo com Cheddar","Milho com Bacon","Marguerita","Mussarela","Napolitana","Palmito","Frango Catupiry","Frango com Cheddar","Atum","Atum Acebolado","Carbonara","Gaúcha","Lombo e Bacon","Mexicana","Paulista","Portuguesa","Calabresa Especial","Lombo Especial","4 Queijos","Calabresa Deliciosa","Vegetariana","5 Queijos",
+].map((name, i) => ({ id: `two-${i}`, name, description: "" }));

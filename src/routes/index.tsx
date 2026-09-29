@@ -122,7 +122,7 @@ function Storefront() {
     }, () => flash("Não foi possível obter sua localização. Digite a distância."));
   };
   const sendWhatsApp = () => {
-    const lines = cart.map((i) => `${i.quantity}x ${i.name}${i.details ? ` (${i.details})` : ""} - ${money(i.price * i.quantity)}`).join("\n");
+    const lines = cart.map((i) => `• ${i.quantity}x ${i.name}${i.details ? `\n   Detalhes: ${i.details}` : ""}\n   Valor unitário: ${money(i.price)}\n   Valor do item: ${money(i.price * i.quantity)}`).join("\n\n");
     const paymentLabel = customer.payment === "Pix" ? "Pix (maquininha)" : customer.payment === "Dinheiro" ? `Dinheiro${customer.change ? ` (Troco para ${money(Number(customer.change))})` : ""}` : "Cartão (maquininha)";
     const info = orderType === "pickup"
       ? "*Retirada no Balcão*\nAv. Inglaterra, 210 - Londrina/PR"
