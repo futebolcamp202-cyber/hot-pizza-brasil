@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Clock3, Download, LocateFixed, MapPin, Minus, Plus, ShoppingBag, Sparkles, X, Search, Home, Store, Pizza, CupSoda, UtensilsCrossed, Phone, Truck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { COMBO_FLAVORS, DEFAULT_SETTINGS, dedupeFlavors, fetchBorders, fetchFlavors, type Border, type Flavor, FALLBACK_IMG, deliveryFee, fetchProducts, fetchSettings, money, themeVars, type CartItem, type Product, type SettingsData } from "@/lib/store";
+import { COMBO_FLAVORS, TWO_FLAVORS_LIST, DEFAULT_SETTINGS, dedupeFlavors, fetchBorders, fetchFlavors, type Border, type Flavor, FALLBACK_IMG, deliveryFee, fetchProducts, fetchSettings, money, themeVars, type CartItem, type Product, type SettingsData } from "@/lib/store";
 
 export const Route = createFileRoute("/")({
   head: () => ({
