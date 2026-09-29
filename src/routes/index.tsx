@@ -99,7 +99,7 @@ function Storefront() {
     flash("Adicionado ao carrinho");
   };
   const openProduct = (p: Product) => {
-    if (p.is_combo || p.allow_two_flavors || (p.requires_border && borders.length)) { setSelected(p); setComboStep(1); setSelectedFlavors([]); setBorder(borders[0]?.name ?? ""); setStep("combo"); }
+    if (p.is_combo || p.allow_two_flavors || p.combo_flavors_step || (p.requires_border && borders.length)) { setSelected(p); setComboStep(1); setSelectedFlavors([]); setBorder(borders[0]?.name ?? ""); setStep("combo"); }
     else addToCart(p);
   };
   const finishCombo = (withDessert: boolean) => {
