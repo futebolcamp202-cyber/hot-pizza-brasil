@@ -94,7 +94,8 @@ function Storefront() {
     const st: ("border" | "flavors" | "confirm")[] = [];
     if (selected.requires_border && borders.length) st.push("border");
     if (selected.is_combo) st.push("flavors", "confirm");
-    else if (selected.allow_two_flavors || selected.combo_flavors_step) st.push("flavors");
+    else if (selected.allow_two_flavors) st.push("flavors", "confirm");
+    else if (selected.combo_flavors_step) st.push("flavors");
     return st;
   }, [selected, borders.length]);
   const curStep = comboSteps[comboStep - 1];
@@ -261,12 +262,12 @@ function Storefront() {
       {step === "combo" && selected && (
         <div className="modal-backdrop"><div className="modal combo-modal">
           <button className="close-btn" onClick={() => setStep("none")}><X size={20} /></button>
-          <div className="modal-kicker">Monte seu combo · Etapa {comboStep} de {comboSteps.length}</div>
+          <div className="modal-kicker">{selected.is_combo ? "Monte seu combo" : "Monte sua pizza"} · Etapa {comboStep} de {comboSteps.length}</div>
           <h2>{curStep === "border" ? "Escolha a sua borda" : curStep === "flavors" ? "Escolha os sabores" : "Tudo certo por aqui?"}</h2>
           {curStep === "border" && <div className="choice-list">{borders.map((b) => <button className={border === b.name ? "choice selected" : "choice"} key={b.id} onClick={() => setBorder(b.name)}>{b.name}<span>{b.price ? `+ ${money(b.price)}` : "Grátis"}</span></button>)}</div>}
           {curStep === "flavors" && <><p className="muted">Selecione até 2 sabores para a sua pizza.</p><div className="flavor-grid">{flavors.map((f) => <button key={f} className={selectedFlavors.includes(f) ? "flavor selected" : "flavor"} onClick={() => setSelectedFlavors((c) => { if (c.includes(f)) return c.filter((x) => x !== f); if (c.length >= 2) { flash("Máximo de 2 sabores. Desmarque um antes."); return c; } return [...c, f]; })}>{f}{flavorDesc[f] && <small style={{ display: "block", opacity: 0.7, fontWeight: 400, fontSize: 11, marginTop: 2 }}>{flavorDesc[f]}</small>}</button>)}</div></>}
-          {curStep === "confirm" && <div className="confirmation"><div className="confirm-icon">✓</div><p><strong>Guaraná 2L confirmado.</strong><br />Seu combo será preparado{comboSteps.includes("border") ? ` com ${border.toLowerCase()}` : ""} com {selectedFlavors.join(" + ")}.</p></div>}
-          <button className="primary-btn full" disabled={(curStep === "flavors" && selectedFlavors.length === 0) || (curStep === "border" && !border)} onClick={() => (comboStep < comboSteps.length ? setComboStep(comboStep + 1) : selected?.is_combo ? setUpsell(true) : finishCombo(false))}>{comboStep < comboSteps.length || curStep === "flavors" ? "Continuar" : "Adicionar ao carrinho"} <ArrowRight size={18} /></button>
+          {curStep === "confirm" && <div className="confirmation"><div className="confirm-icon">✓</div><p>{selected.is_combo && <><strong>Guaraná 2L confirmado.</strong><br /></>}Sua {selected.is_combo ? "combinação" : "pizza"} será preparada{comboSteps.includes("border") ? ` com ${border.toLowerCase()}` : ""} com {selectedFlavors.join(" + ")}.</p></div>}
+          <button className="primary-btn full" disabled={(curStep === "flavors" && selectedFlavors.length === 0) || (curStep === "border" && !border)} onClick={() => (comboStep < comboSteps.length ? setComboStep(comboStep + 1) : selected?.is_combo || selected?.allow_two_flavors ? setUpsell(true) : finishCombo(false))}>{comboStep < comboSteps.length || curStep === "flavors" ? "Continuar" : "Adicionar ao carrinho"} <ArrowRight size={18} /></button>
         </div></div>
       )}
       {upsell && (
