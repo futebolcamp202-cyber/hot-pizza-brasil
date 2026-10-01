@@ -33,6 +33,8 @@ function AdminPanel() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [editing, setEditing] = useState<Product | null>(null);
   const [notice, setNotice] = useState("");
+  const [printing, setPrinting] = useState(false);
+  const printingRef = useRef(false);
 
   const flash = (m: string) => { setNotice(m); setTimeout(() => setNotice(""), 2200); };
 
