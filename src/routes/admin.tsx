@@ -89,12 +89,51 @@ function AdminPanel() {
   const deleteOrder = async (id: string) => { if (!confirm("Excluir este pedido?")) return; await supabase.from("orders").delete().eq("id", id); void loadOrders(); };
   const printReceipt = (o: OrderRow) => {
     const win = window.open("", "_blank", "width=400,height=600");
-    if (!win) return;
-    const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
+    if (!win) return flash("Permita a abertura da janela para imprimir o pedido");
+    const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[c] ?? c);
     const items = o.items.map((i) => `${i.quantity}x ${i.name}${i.details ? ` (${i.details})` : ""} - ${money(i.price * i.quantity)}`).join("\n");
     const txt = `${settings.receipt_header}\n\n${new Date(o.created_at).toLocaleString("pt-BR")}\nCliente: ${o.customer_name}\n${o.order_type === "pickup" ? "RETIRADA NO BALCÃO" : `ENTREGA: ${o.address}, ${o.house_number} (${o.residence_type})`}\n\n${items}\n\nSubtotal: ${money(o.subtotal)}\nEntrega: ${money(o.delivery_fee)}\nTotal: ${money(o.total)}\n\nPagamento: ${o.payment_method}${o.change_for ? `\nTroco para: ${money(o.change_for)}` : ""}`;
-    win.document.write(`<pre style="font-family:monospace;font-size:12px;width:280px;margin:auto;padding:10px;white-space:pre-wrap">${esc(txt)}</pre>`);
-    win.document.close(); win.print();
+    const orderLabel = o.id.slice(0, 8).toUpperCase();
+    win.document.open();
+    win.document.write(`<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pedido ${esc(orderLabel)} - Nostra Casa</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { width: 58mm; max-width: 58mm; margin: 0; padding: 0; height: auto; min-height: 0; overflow: visible; background: #fff; color: #000; }
+      body { font-family: "Courier New", Courier, monospace; }
+      .receipt { width: 58mm; max-width: 58mm; margin: 0; padding: 2mm 3mm 3mm; font-size: 10px; line-height: 1.3; white-space: pre-wrap; overflow-wrap: anywhere; }
+      @media print {
+        @page { size: 58mm auto; margin: 0; }
+        html, body { width: 58mm !important; max-width: 58mm !important; margin: 0 !important; padding: 0 !important; height: auto !important; min-height: 0 !important; overflow: visible !important; }
+        .receipt { width: 58mm !important; max-width: 58mm !important; height: auto !important; min-height: 0 !important; margin: 0 !important; padding: 2mm 3mm 3mm !important; break-after: auto !important; page-break-after: auto !important; }
+      }
+    </style>
+  </head>
+  <body><pre class="receipt">${esc(txt)}</pre></body>
+</html>`);
+    win.document.close();
+
+    let attempts = 0;
+    const printWhenReady = () => {
+      if (win.closed) return;
+      if (win.document.readyState !== "complete" && attempts < 50) {
+        attempts += 1;
+        window.setTimeout(printWhenReady, 50);
+        return;
+      }
+      win.focus();
+      win.requestAnimationFrame(() => {
+        win.requestAnimationFrame(() => window.setTimeout(() => {
+          if (!win.closed) win.print();
+        }, 100));
+      });
+    };
+    win.onafterprint = () => win.close();
+    window.setTimeout(printWhenReady, 0);
   };
 
   if (!checked) return <div className="admin-login-page" style={themeVars(settings)}><p className="muted">Carregando...</p></div>;
