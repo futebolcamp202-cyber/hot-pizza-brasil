@@ -11,3 +11,4 @@
 
 - Store data (products, settings, orders) lives in Lovable Cloud; admin writes gated by user_roles admin role (first signup becomes admin) — keeps owner-only edits server-enforced.
 - Images go to private "images" bucket; stored as 20-year signed URLs — workspace blocks public buckets.
+- Thermal receipts render as complete standalone 58 mm documents and print only after loading — prevents blank jobs and excess paper feed.
