@@ -33,6 +33,8 @@ function AdminPanel() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [editing, setEditing] = useState<Product | null>(null);
   const [notice, setNotice] = useState("");
+  const [printing, setPrinting] = useState(false);
+  const printingRef = useRef(false);
 
   const flash = (m: string) => { setNotice(m); setTimeout(() => setNotice(""), 2200); };
 
@@ -88,52 +90,55 @@ function AdminPanel() {
   const updateOrderStatus = async (id: string, status: string) => { await supabase.from("orders").update({ status }).eq("id", id); void loadOrders(); };
   const deleteOrder = async (id: string) => { if (!confirm("Excluir este pedido?")) return; await supabase.from("orders").delete().eq("id", id); void loadOrders(); };
   const printReceipt = (o: OrderRow) => {
-    const win = window.open("", "_blank", "width=400,height=600");
-    if (!win) return flash("Permita a abertura da janela para imprimir o pedido");
+    if (printingRef.current) return;
+    printingRef.current = true;
+    setPrinting(true);
+    const release = () => { printingRef.current = false; setPrinting(false); };
     const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[c] ?? c);
     const items = o.items.map((i) => `${i.quantity}x ${i.name}${i.details ? ` (${i.details})` : ""} - ${money(i.price * i.quantity)}`).join("\n");
-    const txt = `${settings.receipt_header}\n\n${new Date(o.created_at).toLocaleString("pt-BR")}\nCliente: ${o.customer_name}\n${o.order_type === "pickup" ? "RETIRADA NO BALCÃO" : `ENTREGA: ${o.address}, ${o.house_number} (${o.residence_type})`}\n\n${items}\n\nSubtotal: ${money(o.subtotal)}\nEntrega: ${money(o.delivery_fee)}\nTotal: ${money(o.total)}\n\nPagamento: ${o.payment_method}${o.change_for ? `\nTroco para: ${money(o.change_for)}` : ""}`;
+    const sep = "================================";
+    const txt = `${sep}\n${settings.receipt_header}\n${sep}\n${new Date(o.created_at).toLocaleString("pt-BR")}\nCliente: ${o.customer_name}\n${o.order_type === "pickup" ? "RETIRADA NO BALCÃO" : `ENTREGA: ${o.address}, ${o.house_number} (${o.residence_type})`}\n\n${items}\n\nSubtotal: ${money(o.subtotal)}\nEntrega: ${money(o.delivery_fee)}\nTOTAL: ${money(o.total)}\n\nPagamento: ${o.payment_method}${o.change_for ? `\nTroco para: ${money(o.change_for)}` : ""}\n\nObrigado!\n${sep}\nFIM DO CUPOM`.trim();
     const orderLabel = o.id.slice(0, 8).toUpperCase();
-    win.document.open();
-    win.document.write(`<!doctype html>
-<html lang="pt-BR">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Pedido ${esc(orderLabel)} - Nostra Casa</title>
-    <style>
-      * { box-sizing: border-box; }
-      html, body { width: 58mm; max-width: 58mm; margin: 0; padding: 0; height: auto; min-height: 0; overflow: visible; background: #fff; color: #000; }
-      body { font-family: "Courier New", Courier, monospace; }
-      .receipt { width: 58mm; max-width: 58mm; margin: 0; padding: 2mm 3mm 3mm; font-size: 10px; line-height: 1.3; white-space: pre-wrap; overflow-wrap: anywhere; }
-      @media print {
-        @page { size: 58mm auto; margin: 0; }
-        html, body { width: 58mm !important; max-width: 58mm !important; margin: 0 !important; padding: 0 !important; height: auto !important; min-height: 0 !important; overflow: visible !important; }
-        .receipt { width: 58mm !important; max-width: 58mm !important; height: auto !important; min-height: 0 !important; margin: 0 !important; padding: 2mm 3mm 3mm !important; break-after: auto !important; page-break-after: auto !important; }
-      }
-    </style>
-  </head>
-  <body><pre class="receipt">${esc(txt)}</pre></body>
-</html>`);
-    win.document.close();
+    const html = `<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Pedido ${esc(orderLabel)} - Nostra Casa</title>
+<style>
+  @page { size: 58mm auto; margin: 0; }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { width: 58mm; max-width: 58mm; margin: 0; padding: 0; height: auto; min-height: 0; max-height: none; overflow: visible; background: #fff; color: #000; }
+  .receipt { display: block; width: 58mm; max-width: 58mm; height: auto; min-height: 0; max-height: none; margin: 0; padding: 2mm 3mm 1mm; font: 10px/1.25 "Courier New", Courier, monospace; white-space: pre-wrap; overflow-wrap: anywhere; break-after: auto; break-inside: auto; }
+  @media print {
+    html, body { width: 58mm !important; max-width: 58mm !important; margin: 0 !important; padding: 0 !important; height: auto !important; min-height: 0 !important; max-height: none !important; overflow: visible !important; }
+  }
+</style></head><body><pre class="receipt">${esc(txt)}</pre></body></html>`;
 
-    let attempts = 0;
-    const printWhenReady = () => {
-      if (win.closed) return;
-      if (win.document.readyState !== "complete" && attempts < 50) {
-        attempts += 1;
-        window.setTimeout(printWhenReady, 50);
-        return;
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("aria-hidden", "true");
+    Object.assign(iframe.style, { position: "fixed", left: "-9999px", top: "0", width: "58mm", height: "0", border: "0", visibility: "hidden" });
+    let fired = false;
+    const cleanup = () => { window.setTimeout(() => { iframe.remove(); release(); }, 1000); };
+    iframe.onload = async () => {
+      if (fired) return;
+      const doc = iframe.contentDocument;
+      const win = iframe.contentWindow;
+      // Só imprime se o cupom real estiver no documento (nunca about:blank vazio)
+      if (!doc || !win || !doc.querySelector(".receipt")?.textContent?.trim()) return;
+      fired = true;
+      try {
+        if (doc.fonts?.ready) await doc.fonts.ready;
+        await Promise.all(Array.from(doc.images).map((img) => img.complete ? null : new Promise((r) => { img.onload = r; img.onerror = r; })));
+        await new Promise((r) => win.requestAnimationFrame(() => win.requestAnimationFrame(() => window.setTimeout(r, 250))));
+        win.focus();
+        win.print();
+      } catch (e) {
+        console.error("Erro ao imprimir cupom:", e);
+        flash("Não foi possível imprimir o pedido");
+      } finally {
+        cleanup();
       }
-      win.focus();
-      win.requestAnimationFrame(() => {
-        win.requestAnimationFrame(() => window.setTimeout(() => {
-          if (!win.closed) win.print();
-        }, 100));
-      });
     };
-    win.onafterprint = () => win.close();
-    window.setTimeout(printWhenReady, 0);
+    iframe.srcdoc = html;
+    document.body.appendChild(iframe);
+    window.setTimeout(() => { if (!fired) { iframe.remove(); release(); flash("Falha ao preparar a impressão"); } }, 10000);
   };
 
   if (!checked) return <div className="admin-login-page" style={themeVars(settings)}><p className="muted">Carregando...</p></div>;
