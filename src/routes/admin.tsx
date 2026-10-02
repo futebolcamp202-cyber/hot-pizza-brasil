@@ -95,21 +95,38 @@ function AdminPanel() {
     setPrinting(true);
     const release = () => { printingRef.current = false; setPrinting(false); };
     const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[c] ?? c);
-    const items = o.items.map((i) => `${i.quantity}x ${i.name}${i.details ? ` (${i.details})` : ""} - ${money(i.price * i.quantity)}`).join("\n");
-    const sep = "================================";
-    const txt = `${sep}\n${settings.receipt_header}\n${sep}\n${new Date(o.created_at).toLocaleString("pt-BR")}\nCliente: ${o.customer_name}\n${o.order_type === "pickup" ? "RETIRADA NO BALCÃO" : `ENTREGA: ${o.address}, ${o.house_number} (${o.residence_type})`}\n\n${items}\n\nSubtotal: ${money(o.subtotal)}\nEntrega: ${money(o.delivery_fee)}\nTOTAL: ${money(o.total)}\n\nPagamento: ${o.payment_method}${o.change_for ? `\nTroco para: ${money(o.change_for)}` : ""}\n\nObrigado!\n${sep}\nFIM DO CUPOM`.trim();
+    const row = (l: string, r: string, cls = "") => `<div class="row ${cls}"><span>${esc(l)}</span><span>${esc(r)}</span></div>`;
+    const items = o.items.map((i) => `<div class="item">${row(`${i.quantity}x ${i.name}`, money(i.price * i.quantity), "bold")}${i.details ? `<div class="sm">${esc(i.details)}</div>` : ""}</div>`).join("");
     const orderLabel = o.id.slice(0, 8).toUpperCase();
+    const body = `<div class="center bold lg">${esc(settings.receipt_header)}</div>
+<div class="center sm">Pedido #${esc(orderLabel)}</div>
+<div class="center sm">${esc(new Date(o.created_at).toLocaleString("pt-BR"))}</div>
+<div class="dashed"></div>
+<div><span class="bold">Cliente:</span> ${esc(o.customer_name)}</div>
+<div class="bold">${o.order_type === "pickup" ? "RETIRADA NO BALCÃO" : `ENTREGA: ${esc(`${o.address}, ${o.house_number} (${o.residence_type})`)}`}</div>
+<div class="dashed"></div>
+${items}
+<div class="dashed"></div>
+${row("Subtotal", money(o.subtotal))}${row("Entrega", money(o.delivery_fee))}${row("TOTAL", money(o.total), "bold lg")}
+<div class="dashed"></div>
+<div><span class="bold">Pagamento:</span> ${esc(o.payment_method)}</div>${o.change_for ? row("Troco para", money(o.change_for)) : ""}
+<div class="dashed"></div>
+<div class="center bold">Obrigado!</div>`;
     const html = `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><title>Pedido ${esc(orderLabel)} - Nostra Casa</title>
 <style>
   @page { size: 58mm auto; margin: 0; }
   *, *::before, *::after { box-sizing: border-box; }
   html, body { width: 58mm; max-width: 58mm; margin: 0; padding: 0; height: auto; min-height: 0; max-height: none; overflow: visible; background: #fff; color: #000; }
-  .receipt { display: block; width: 58mm; max-width: 58mm; height: auto; min-height: 0; max-height: none; margin: 0; padding: 2mm 3mm 1mm; font: 10px/1.25 "Courier New", Courier, monospace; white-space: pre-wrap; overflow-wrap: anywhere; break-after: auto; break-inside: auto; }
+  .receipt { width: 56mm; max-width: 56mm; height: auto; min-height: 0; margin: 0; padding: 2mm; font-family: 'Courier New', 'Lucida Console', monospace; font-size: 9px; line-height: 1.35; overflow-wrap: anywhere; }
+  .center { text-align: center; } .bold { font-weight: bold; } .sm { font-size: .85em; } .lg { font-size: 1.15em; }
+  .dashed { border-top: 1px dashed #000; margin: 4px 0; }
+  .row { display: flex; justify-content: space-between; gap: 4px; } .row span:last-child { white-space: nowrap; }
+  .item { margin-bottom: 2px; }
   @media print {
     html, body { width: 58mm !important; max-width: 58mm !important; margin: 0 !important; padding: 0 !important; height: auto !important; min-height: 0 !important; max-height: none !important; overflow: visible !important; }
   }
-</style></head><body><pre class="receipt">${esc(txt)}</pre></body></html>`;
+</style></head><body><div class="receipt">${body}</div></body></html>`;
 
     const iframe = document.createElement("iframe");
     iframe.setAttribute("aria-hidden", "true");
