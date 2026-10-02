@@ -144,6 +144,17 @@ ${row("Subtotal", money(o.subtotal))}${row("Entrega", money(o.delivery_fee))}${r
         if (doc.fonts?.ready) await doc.fonts.ready;
         await Promise.all(Array.from(doc.images).map((img) => img.complete ? null : new Promise((r) => { img.onload = r; img.onerror = r; })));
         await new Promise((r) => win.requestAnimationFrame(() => win.requestAnimationFrame(() => window.setTimeout(r, 250))));
+        // Mede a altura REAL do cupom já renderizado e fixa a página nesse tamanho exato
+        // ("58mm auto" é inválido no Chrome e faz ele usar o papel do driver, ex.: 210 mm).
+        const receiptEl = doc.querySelector(".receipt") as HTMLElement;
+        const heightPx = Math.ceil(receiptEl.getBoundingClientRect().height);
+        const printHeightMm = Math.ceil((heightPx * 25.4) / 96) + 3;
+        const pageStyle = doc.createElement("style");
+        pageStyle.id = "dynamic-page-size";
+        pageStyle.textContent = `@page { size: 58mm ${printHeightMm}mm; margin: 0; } html, body { height: ${printHeightMm}mm !important; max-height: ${printHeightMm}mm !important; overflow: hidden !important; }`;
+        doc.head.appendChild(pageStyle);
+        doc.body.setAttribute("data-print-height-mm", String(printHeightMm));
+        await new Promise((r) => win.requestAnimationFrame(() => window.setTimeout(r, 50)));
         win.focus();
         win.print();
       } catch (e) {
