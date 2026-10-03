@@ -118,13 +118,24 @@ ${row("Subtotal", money(o.subtotal))}${row("Entrega", money(o.delivery_fee))}${r
   @page { size: 58mm auto; margin: 0; }
   *, *::before, *::after { box-sizing: border-box; }
   html, body { width: 58mm; max-width: 58mm; margin: 0; padding: 0; height: auto; min-height: 0; max-height: none; overflow: visible; background: #fff; color: #000; }
-  .receipt { width: 56mm; max-width: 56mm; height: auto; min-height: 0; margin: 0; padding: 2mm; font-family: 'Courier New', 'Lucida Console', monospace; font-size: 9px; line-height: 1.35; overflow-wrap: anywhere; }
-  .center { text-align: center; } .bold { font-weight: bold; } .sm { font-size: .85em; } .lg { font-size: 1.15em; }
-  .dashed { border-top: 1px dashed #000; margin: 4px 0; }
-  .row { display: flex; justify-content: space-between; gap: 4px; } .row span:last-child { white-space: nowrap; }
+  .receipt { width: 56mm; max-width: 56mm; height: auto; min-height: 0; margin: 0; padding: 2mm; font-family: 'Courier New', 'Lucida Console', monospace; font-size: 9.5px; line-height: 1.4; overflow-wrap: anywhere; color: #000; }
+  .center { text-align: center; } .bold { font-weight: 700; } .sm { font-size: .9em; } .lg { font-size: 1.2em; }
+  .dashed { border-top: 1px solid #000; margin: 4px 0; }
+  .row { display: flex; justify-content: space-between; gap: 4px; color: #000; } .row span:last-child { white-space: nowrap; }
   .item { margin-bottom: 2px; }
   @media print {
     html, body { width: 58mm !important; max-width: 58mm !important; margin: 0 !important; padding: 0 !important; height: auto !important; min-height: 0 !important; max-height: none !important; overflow: visible !important; }
+    /* Texto térmico forte: preto puro e bold em tudo */
+    *, *::before, *::after {
+      color: #000 !important;
+      font-weight: 700 !important;
+      opacity: 1 !important;
+      filter: none !important;
+      text-shadow: none !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .dashed { border-top: 2px solid #000 !important; }
   }
 </style></head><body><div class="receipt">${body}</div></body></html>`;
 
