@@ -96,14 +96,21 @@ function AdminPanel() {
     const release = () => { printingRef.current = false; setPrinting(false); };
     const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[c] ?? c);
     const row = (l: string, r: string, cls = "") => `<div class="row ${cls}"><span>${esc(l)}</span><span>${esc(r)}</span></div>`;
-    const items = o.items.map((i) => `<div class="item">${row(`${i.quantity}x ${i.name}`, money(i.price * i.quantity), "bold")}${i.details ? `<div class="sm">${esc(i.details)}</div>` : ""}</div>`).join("");
+    const items = o.items.map((i) => `<div class="item">
+${row(`${i.quantity}x ${i.name}`, money(i.price * i.quantity), "bold")}
+<div class="sm">Valor unitário: ${esc(money(i.price))}</div>
+${i.details ? `<div class="sm"><span class="bold">Detalhes:</span> ${esc(i.details)}</div>` : ""}
+</div>`).join("");
     const orderLabel = o.id.slice(0, 8).toUpperCase();
     const body = `<div class="center bold lg">${esc(settings.receipt_header)}</div>
 <div class="center sm">Pedido #${esc(orderLabel)}</div>
 <div class="center sm">${esc(new Date(o.created_at).toLocaleString("pt-BR"))}</div>
 <div class="dashed"></div>
 <div><span class="bold">Cliente:</span> ${esc(o.customer_name)}</div>
-<div class="bold">${o.order_type === "pickup" ? "RETIRADA NO BALCÃO" : `ENTREGA: ${esc(`${o.address}, ${o.house_number} (${o.residence_type})`)}`}</div>
+<div class="bold">${o.order_type === "pickup" ? "RETIRADA NO BALCÃO" : "ENTREGA"}</div>
+${o.order_type === "pickup" ? "" : `<div>Endereço: ${esc(`${o.address}, ${o.house_number}`)}</div>
+<div>Residência: ${esc(o.residence_type)}</div>
+<div>Distância: ${esc(String(o.distance_km))} km</div>`}
 <div class="dashed"></div>
 ${items}
 <div class="dashed"></div>
@@ -141,7 +148,9 @@ ${row("Subtotal", money(o.subtotal))}${row("Entrega", money(o.delivery_fee))}${r
 
     const iframe = document.createElement("iframe");
     iframe.setAttribute("aria-hidden", "true");
-    Object.assign(iframe.style, { position: "fixed", left: "-9999px", top: "0", width: "58mm", height: "0", border: "0", visibility: "hidden" });
+    // Mantém o iframe fora da tela, mas renderizável. `visibility: hidden` também
+    // ocultava o conteúdo na impressão, deixando aparecer apenas a data do Chrome.
+    Object.assign(iframe.style, { position: "fixed", left: "-9999px", top: "0", width: "58mm", height: "1px", border: "0" });
     let fired = false;
     const cleanup = () => { window.setTimeout(() => { iframe.remove(); release(); }, 1000); };
     iframe.onload = async () => {
