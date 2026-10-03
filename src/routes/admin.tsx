@@ -150,7 +150,7 @@ ${row("Subtotal", money(o.subtotal))}${row("Entrega", money(o.delivery_fee))}${r
     iframe.setAttribute("aria-hidden", "true");
     // Mantém o iframe fora da tela, mas renderizável. `visibility: hidden` também
     // ocultava o conteúdo na impressão, deixando aparecer apenas a data do Chrome.
-    Object.assign(iframe.style, { position: "fixed", left: "-9999px", top: "0", width: "58mm", height: "1px", border: "0" });
+    Object.assign(iframe.style, { position: "fixed", left: "0", top: "0", width: "58mm", height: "1px", border: "0" });
     let fired = false;
     const cleanup = () => { window.setTimeout(() => { iframe.remove(); release(); }, 1000); };
     iframe.onload = async () => {
@@ -169,6 +169,7 @@ ${row("Subtotal", money(o.subtotal))}${row("Entrega", money(o.delivery_fee))}${r
         const receiptEl = doc.querySelector(".receipt") as HTMLElement;
         const heightPx = Math.ceil(receiptEl.getBoundingClientRect().height);
         const printHeightMm = Math.ceil((heightPx * 25.4) / 96) + 3;
+        iframe.style.height = `${printHeightMm}mm`;
         const pageStyle = doc.createElement("style");
         pageStyle.id = "dynamic-page-size";
         pageStyle.textContent = `@page { size: 58mm ${printHeightMm}mm; margin: 0; } html, body { height: ${printHeightMm}mm !important; max-height: ${printHeightMm}mm !important; overflow: hidden !important; }`;
