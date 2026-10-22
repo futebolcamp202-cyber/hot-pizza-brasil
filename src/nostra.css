@@ -297,3 +297,10 @@ footer p { color: #716b63; font-size: 11px; }
 .install-steps p { margin: 4px 0 0; opacity: .85; font-size: .9rem; }
 .install-num { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--install-yellow); color: var(--install-yellow-ink); font-weight: 800; }
 .secondary-btn.full { width: 100%; }
+
+/* Opções por produto (painel) */
+.opt-picker { margin-top: 8px; }
+.opt-picker .tag-item { font-size: 12px; padding: 5px 10px; }
+.opt-picker .tag-item button { color: var(--button); }
+.opt-picker .tag-item.removed { opacity: .55; text-decoration: line-through; cursor: pointer; }
+.product-form select.admin-select { display: block; width: 100%; margin-top: 5px; background: #211c17; border: 1px solid #403428; border-radius: 7px; padding: 10px; color: white; outline: none; }
