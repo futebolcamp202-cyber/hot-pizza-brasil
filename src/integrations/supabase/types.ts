@@ -122,14 +122,19 @@ export type Database = {
           created_at: string
           description: string
           extras: string[]
+          hidden_options: Json
           id: string
           image_url: string | null
           ingredients: string[]
           is_combo: boolean
           name: string
+          pastel_flavors_step: boolean
           price: number
+          price_label: string
           requires_border: boolean
+          savory_flavors_step: boolean
           sort_order: number
+          trad_borders_step: boolean
         }
         Insert: {
           allow_two_flavors?: boolean
@@ -139,14 +144,19 @@ export type Database = {
           created_at?: string
           description?: string
           extras?: string[]
+          hidden_options?: Json
           id?: string
           image_url?: string | null
           ingredients?: string[]
           is_combo?: boolean
           name: string
+          pastel_flavors_step?: boolean
           price?: number
+          price_label?: string
           requires_border?: boolean
+          savory_flavors_step?: boolean
           sort_order?: number
+          trad_borders_step?: boolean
         }
         Update: {
           allow_two_flavors?: boolean
@@ -156,53 +166,67 @@ export type Database = {
           created_at?: string
           description?: string
           extras?: string[]
+          hidden_options?: Json
           id?: string
           image_url?: string | null
           ingredients?: string[]
           is_combo?: boolean
           name?: string
+          pastel_flavors_step?: boolean
           price?: number
+          price_label?: string
           requires_border?: boolean
+          savory_flavors_step?: boolean
           sort_order?: number
+          trad_borders_step?: boolean
         }
         Relationships: []
       }
       store_settings: {
         Row: {
           background_color: string
+          broto_price: number
           button_color: string
           cover_image_url: string | null
           favicon_url: string | null
           id: string
+          opening_hours: string
           primary_color: string
           profile_image_url: string | null
           receipt_header: string
           store_name: string
           updated_at: string
+          whatsapp_number: string
         }
         Insert: {
           background_color?: string
+          broto_price?: number
           button_color?: string
           cover_image_url?: string | null
           favicon_url?: string | null
           id?: string
+          opening_hours?: string
           primary_color?: string
           profile_image_url?: string | null
           receipt_header?: string
           store_name?: string
           updated_at?: string
+          whatsapp_number?: string
         }
         Update: {
           background_color?: string
+          broto_price?: number
           button_color?: string
           cover_image_url?: string | null
           favicon_url?: string | null
           id?: string
+          opening_hours?: string
           primary_color?: string
           profile_image_url?: string | null
           receipt_header?: string
           store_name?: string
           updated_at?: string
+          whatsapp_number?: string
         }
         Relationships: []
       }
