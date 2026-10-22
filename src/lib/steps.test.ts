@@ -21,7 +21,7 @@ describe("preço com borda e broto", () => {
 describe("opções removidas no painel", () => {
   test("sabor removido do produto não aparece para o cliente", () => {
     const steps = buildSteps({ ...base, pastel_flavors_step: true, hidden_options: { pastel_flavors: ["Nutella"] } }, db);
-    const names = steps[0].options.map((o) => o.name);
+    const names = (steps[0]?.options ?? []).map((o) => o.name);
     expect(names).not.toContain("Nutella");
     expect(names).toContain("Carne");
   });
