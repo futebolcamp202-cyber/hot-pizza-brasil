@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { HiddenOptions } from "@/lib/steps";
 
 export type Product = {
   id: string;
@@ -15,12 +16,21 @@ export type Product = {
   requires_border: boolean;
   allow_two_flavors: boolean;
   combo_flavors_step: boolean;
+  savory_flavors_step: boolean;
+  trad_borders_step: boolean;
+  pastel_flavors_step: boolean;
+  price_label: string;
+  hidden_options: HiddenOptions;
 };
 export type Flavor = { id: string; name: string; description?: string };
 export type Border = { id: string; name: string; price: number; sort_order: number };
 export type CartItem = Product & { quantity: number; details?: string };
 export type SettingsData = {
   id: string;
+  store_name: string;
+  whatsapp_number: string;
+  opening_hours: string;
+  broto_price: number;
   primary_color: string;
   background_color: string;
   button_color: string;
@@ -37,10 +47,14 @@ export type OrderRow = {
 
 export const DEFAULT_SETTINGS: SettingsData = {
   id: "",
+  store_name: "PIZZA HOT",
+  whatsapp_number: "(43) 99630-9759",
+  opening_hours: "Aberto até 03h",
+  broto_price: 10,
   primary_color: "#f3b91b",
   background_color: "#090909",
   button_color: "#d71920",
-  receipt_header: "NOSTRA CASA PIZZARIA E LANCHES\nAvenida Inglaterra, 210 - Londrina/PR\nWhatsApp: (43) 99630-9759",
+  receipt_header: "PIZZA HOT\nAvenida Inglaterra, 210 - Londrina/PR\nWhatsApp: (43) 99630-9759",
   favicon_url: null,
   cover_image_url: null,
   profile_image_url: null,
@@ -59,7 +73,7 @@ export function deliveryFee(distance: number) {
   return 0;
 }
 export function normalizeProduct(p: any): Product {
-  return { ...p, requires_border: !!p.requires_border, allow_two_flavors: !!p.allow_two_flavors, combo_flavors_step: !!p.combo_flavors_step, price: Number(p.price), ingredients: p.ingredients ?? [], extras: p.extras ?? [] };
+  return { ...p, requires_border: !!p.requires_border, allow_two_flavors: !!p.allow_two_flavors, combo_flavors_step: !!p.combo_flavors_step, savory_flavors_step: !!p.savory_flavors_step, trad_borders_step: !!p.trad_borders_step, pastel_flavors_step: !!p.pastel_flavors_step, price_label: p.price_label ?? "", hidden_options: (p.hidden_options && typeof p.hidden_options === "object" ? p.hidden_options : {}) as HiddenOptions, price: Number(p.price), ingredients: p.ingredients ?? [], extras: p.extras ?? [] };
 }
 
 export async function fetchProducts(onlyAvailable: boolean) {
@@ -71,7 +85,7 @@ export async function fetchProducts(onlyAvailable: boolean) {
 }
 export async function fetchSettings(): Promise<SettingsData> {
   const { data } = await supabase.from("store_settings").select("*").limit(1).maybeSingle();
-  return data ? ({ ...DEFAULT_SETTINGS, ...data } as SettingsData) : DEFAULT_SETTINGS;
+  return data ? ({ ...DEFAULT_SETTINGS, ...data, broto_price: Number(data.broto_price ?? 10) } as SettingsData) : DEFAULT_SETTINGS;
 }
 
 /** Uploads an image file and returns a long-lived URL for it. */
@@ -104,26 +118,3 @@ export async function fetchBorders(): Promise<Border[]> {
   if (error) throw error;
   return (data ?? []).map((b: any) => ({ id: b.id, name: b.name, price: Number(b.price), sort_order: b.sort_order }));
 }
-
-/** Lista fixa da etapa "Sabores do Combo (Até 2 sabores)". */
-export const COMBO_FLAVORS: Flavor[] = ([
-  ["2 Queijos", "Molho de tomate, mussarela, provolone e orégano"],
-  ["Bacon", "Molho de tomate, mussarela, bacon e orégano"],
-  ["Alho Crocante", "Molho de tomate, mussarela, alho frito e orégano"],
-  ["Calabresa Acebolada", "Molho de tomate, mussarela, calabresa, cebola e orégano"],
-  ["Calabresa sem Cebola", "Molho de tomate, mussarela, calabresa e orégano"],
-  ["Lombo Catupiry", "Molho de tomate, mussarela, lombo fatiado, catupiry e orégano"],
-  ["Lombo com Cheddar", "Molho de tomate, mussarela, lombo fatiado, cheddar e orégano"],
-  ["Milho com Bacon", "Molho de tomate, mussarela, milho, bacon e orégano"],
-  ["Marguerita", "Molho de tomate, mussarela, rodelas de tomate e orégano"],
-  ["Mussarela", "Molho de tomate, mussarela e orégano"],
-  ["Napolitana", "Molho de tomate, presunto, tomate, mussarela e orégano"],
-  ["Palmito", "Molho de tomate, mussarela, palmito, catupiry e orégano"],
-  ["Frango com Cheddar", "Molho de tomate, frango, cheddar, mussarela e orégano"],
-  ["Frango com Catupiry", "Molho de tomate, frango, requeijão tipo catupiry, mussarela e orégano"],
-] as [string, string][]).map(([name, description], i) => ({ id: `combo-${i}`, name, description }));
-
-/** Lista fixa da opção "Ativar etapa de escolha de até 2 sabores neste produto". */
-export const TWO_FLAVORS_LIST: Flavor[] = [
-  "2 Queijos","Alho Crocante","Bacon","Calabresa Sem Cebola","Calabresa Acebolada","Lombo com Catupiry","Lombo com Cheddar","Milho com Bacon","Marguerita","Mussarela","Napolitana","Palmito","Frango Catupiry","Frango com Cheddar","Atum","Atum Acebolado","Carbonara","Gaúcha","Lombo e Bacon","Mexicana","Paulista","Portuguesa","Calabresa Especial","Lombo Especial","4 Queijos","Calabresa Deliciosa","Vegetariana","5 Queijos",
-].map((name, i) => ({ id: `two-${i}`, name, description: "" }));

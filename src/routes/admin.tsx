@@ -4,15 +4,16 @@ import type { Session } from "@supabase/supabase-js";
 import { CheckCircle2, ImagePlus, LogIn, LogOut, Pencil, Plus, Printer, Receipt, Save, Settings, ShoppingBag, Trash2, UserPlus, X, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { DEFAULT_SETTINGS, FALLBACK_IMG, fetchProducts, fetchFlavors, fetchBorders, normName, type Flavor, type Border, fetchSettings, money, themeVars, uploadImage, type OrderRow, type Product, type SettingsData } from "@/lib/store";
+import { MENU_CATEGORIES, allStepOptions, stepKeysFor, type OptionItem, type StepKey } from "@/lib/steps";
 
 export const Route = createFileRoute("/admin")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "Painel do dono | Nostra Casa" },
-      { name: "description", content: "Painel administrativo da Nostra Casa Pizzaria e Lanches." },
-      { property: "og:title", content: "Painel do dono | Nostra Casa" },
-      { property: "og:description", content: "Gerencie cardápio, pedidos e fotos da Nostra Casa." },
+      { title: "Painel do dono | Pizza Hot" },
+      { name: "description", content: "Painel administrativo da Pizza Hot." },
+      { property: "og:title", content: "Painel do dono | Pizza Hot" },
+      { property: "og:description", content: "Gerencie cardápio, pedidos e fotos da Pizza Hot." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "robots", content: "noindex" },
@@ -21,7 +22,7 @@ export const Route = createFileRoute("/admin")({
   component: AdminPanel,
 });
 
-const EMPTY_PRODUCT: Product = { id: "", name: "", description: "", price: 0, image_url: "", category: "Pizzas", is_combo: false, requires_border: false, allow_two_flavors: false, combo_flavors_step: false, ingredients: [], extras: [], available: true, sort_order: 0 };
+const EMPTY_PRODUCT: Product = { id: "", name: "", description: "", price: 0, image_url: "", category: "Pizzas salgadas", is_combo: false, requires_border: false, allow_two_flavors: false, combo_flavors_step: false, savory_flavors_step: false, trad_borders_step: false, pastel_flavors_step: false, price_label: "", hidden_options: {}, ingredients: [], extras: [], available: true, sort_order: 0 };
 
 function AdminPanel() {
   const [session, setSession] = useState<Session | null>(null);
@@ -34,6 +35,7 @@ function AdminPanel() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [notice, setNotice] = useState("");
   const [printing, setPrinting] = useState(false);
+  const [optionDb, setOptionDb] = useState<{ borders: OptionItem[]; pizzaFlavors: OptionItem[] }>({ borders: [], pizzaFlavors: [] });
   const printingRef = useRef(false);
 
   const flash = (m: string) => { setNotice(m); setTimeout(() => setNotice(""), 2200); };
@@ -56,6 +58,8 @@ function AdminPanel() {
   async function loadMenu() {
     const [p, s] = await Promise.all([fetchProducts(false), fetchSettings()]);
     setProducts(p); setSettings(s);
+    const [b, fl] = await Promise.all([fetchBorders().catch(() => [] as Border[]), fetchFlavors().catch(() => [] as Flavor[])]);
+    setOptionDb({ borders: b.map((x) => ({ name: x.name, price: x.price })), pizzaFlavors: fl.map((x) => ({ name: x.name, description: x.description ?? "", price: 0 })) });
   }
   async function loadOrders() {
     const { data } = await supabase.from("orders").select("*").order("created_at", { ascending: false }).limit(100);
@@ -64,7 +68,7 @@ function AdminPanel() {
 
   const saveProduct = async (p: Product) => {
     if (!p.name.trim()) return flash("Informe o nome do produto");
-    const payload = { name: p.name.trim(), description: p.description, price: Number(p.price) || 0, image_url: p.image_url || null, category: p.category || "Pizzas", is_combo: p.is_combo, requires_border: p.requires_border, allow_two_flavors: p.allow_two_flavors, combo_flavors_step: p.combo_flavors_step, ingredients: p.ingredients.filter(Boolean), extras: p.extras.filter(Boolean), available: p.available, sort_order: Number(p.sort_order) || 0 };
+    const payload = { name: p.name.trim(), description: p.description, price: Number(p.price) || 0, image_url: p.image_url || null, category: p.category || "Pizzas", is_combo: p.is_combo, requires_border: p.requires_border, allow_two_flavors: p.allow_two_flavors, combo_flavors_step: p.combo_flavors_step, savory_flavors_step: p.savory_flavors_step, trad_borders_step: p.trad_borders_step, pastel_flavors_step: p.pastel_flavors_step, price_label: p.price_label.trim(), hidden_options: p.hidden_options ?? {}, ingredients: p.ingredients.filter(Boolean), extras: p.extras.filter(Boolean), available: p.available, sort_order: Number(p.sort_order) || 0 };
     const { error } = p.id ? await supabase.from("products").update(payload).eq("id", p.id) : await supabase.from("products").insert(payload);
     if (error) return flash("Erro ao salvar: " + error.message);
     setEditing(null); await loadMenu(); flash("Produto salvo");
@@ -120,7 +124,7 @@ ${row("Subtotal", money(o.subtotal))}${row("Entrega", money(o.delivery_fee))}${r
 <div class="dashed"></div>
 <div class="center bold">Obrigado!</div>`;
     const html = `<!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8"><title>Pedido ${esc(orderLabel)} - Nostra Casa</title>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Pedido ${esc(orderLabel)} - ${esc(settings.store_name || "PIZZA HOT")}</title>
 <style>
   @page { size: 58mm auto; margin: 0; }
   *, *::before, *::after { box-sizing: border-box; }
@@ -206,7 +210,7 @@ ${row("Subtotal", money(o.subtotal))}${row("Entrega", money(o.delivery_fee))}${r
   return (
     <div className="app admin-full" style={themeVars(settings)}>
       <header className="topbar admin-topbar">
-        <div className="brand"><div className="brand-mark">NC</div><div><strong>NOSTRA CASA</strong><span>PAINEL DO DONO</span></div></div>
+        <div className="brand"><div className="brand-mark">PH</div><div><strong>{settings.store_name || "PIZZA HOT"}</strong><span>PAINEL DO DONO</span></div></div>
         <div className="header-actions">
           <Link to="/" className="ghost-btn"><ShoppingBag size={17} /> Ver loja</Link>
           <button className="ghost-btn" onClick={() => supabase.auth.signOut()}><LogOut size={17} /> Sair</button>
@@ -256,14 +260,14 @@ ${row("Subtotal", money(o.subtotal))}${row("Entrega", money(o.delivery_fee))}${r
         {view === "menu" && (
           <div className="admin-menu">
             <button className="primary-btn" onClick={() => setEditing({ ...EMPTY_PRODUCT, sort_order: products.length + 1 })}><Plus size={17} /> Novo produto</button>
-            {editing && !editing.id && <ProductForm key="new" product={editing} onSave={saveProduct} onCancel={() => setEditing(null)} onError={flash} />}
+            {editing && !editing.id && <ProductForm key="new" product={editing} optionDb={optionDb} categories={products.map((x) => x.category)} onSave={saveProduct} onCancel={() => setEditing(null)} onError={flash} />}
             {products.map((p) => (
               <div key={p.id}>
                 <div className="menu-item" style={{ opacity: p.available ? 1 : 0.5 }}>
                   <div className="menu-item-img"><img src={p.image_url || FALLBACK_IMG} alt={p.name} /></div>
                   <div className="menu-item-body">
                     <strong>{p.name}</strong>
-                    <span>{money(p.price)} · {p.category}{p.available ? "" : " · Oculto"}</span>
+                    <span>{p.price_label?.trim() || money(p.price)} · {p.category}{p.available ? "" : " · Oculto"}</span>
                     {p.is_combo && <span className="combo-flag">Combo</span>}
                   </div>
                   <div className="menu-item-actions">
@@ -272,7 +276,7 @@ ${row("Subtotal", money(o.subtotal))}${row("Entrega", money(o.delivery_fee))}${r
                     <button title="Remover" onClick={() => deleteProduct(p)}><Trash2 size={15} /></button>
                   </div>
                 </div>
-                {editing?.id === p.id && <ProductForm key={p.id} product={editing} onSave={saveProduct} onCancel={() => setEditing(null)} onError={flash} />}
+                {editing?.id === p.id && <ProductForm key={p.id} product={editing} optionDb={optionDb} categories={products.map((x) => x.category)} onSave={saveProduct} onCancel={() => setEditing(null)} onError={flash} />}
               </div>
             ))}
           </div>
@@ -308,7 +312,7 @@ function AuthCard({ settings }: { settings: SettingsData }) {
   return (
     <div className="admin-login-page" style={themeVars(settings)}>
       <div className="admin-login-card">
-        <div className="brand"><div className="brand-mark">NC</div><div><strong>NOSTRA CASA</strong><span>PIZZARIA & LANCHES</span></div></div>
+        <div className="brand"><div className="brand-mark">PH</div><div><strong>{settings.store_name || "PIZZA HOT"}</strong><span>PIZZARIA & LANCHES</span></div></div>
         <div className="modal-kicker">Painel administrativo</div>
         <h2>{mode === "login" ? "Entrar na conta" : "Criar conta"}</h2>
         <p className="muted">{mode === "login" ? "Acesse o painel de gestão da pizzaria." : "A primeira conta criada vira a conta do dono."}</p>
@@ -373,23 +377,54 @@ function ListEditor({ title, items, onChange, placeholder }: { title: string; it
   );
 }
 
-function ProductForm({ product, onSave, onCancel, onError }: { product: Product; onSave: (p: Product) => void; onCancel: () => void; onError: (m: string) => void }) {
+const STEP_TOGGLES: [keyof Product, StepKey, string][] = [
+  ["is_combo", "pizza_flavors", "É um combo (cliente escolhe sabores)"],
+  ["requires_border", "border", "Exigir Etapa de Borda"],
+  ["trad_borders_step", "trad_border", "Ativar Etapa - Bordas Massas Tradicionais"],
+  ["allow_two_flavors", "two_flavors", "Ativar etapa de escolha de até 2 sabores neste produto"],
+  ["combo_flavors_step", "combo_flavors", "Ativar Etapa - Sabores do Combo (Até 2 sabores)"],
+  ["savory_flavors_step", "savory_flavors", "Ativar Etapa - Sabores Salgadas"],
+  ["pastel_flavors_step", "pastel_flavors", "Ativar Etapa - Sabor Pastéis"],
+];
+
+function OptionPicker({ all, hidden, onChange }: { all: OptionItem[]; hidden: string[]; onChange: (h: string[]) => void }) {
+  const hiddenSet = new Set(hidden);
+  const kept = all.filter((o) => !hiddenSet.has(o.name));
+  const removed = all.filter((o) => hiddenSet.has(o.name));
+  if (all.length === 0) return <div className="form-section opt-picker"><span className="muted" style={{ fontSize: 12 }}>Nenhuma opção cadastrada para esta etapa.</span></div>;
+  return (
+    <div className="form-section opt-picker">
+      <strong>Opções que o cliente vai ver ({kept.length} de {all.length})</strong>
+      <span className="muted" style={{ fontSize: 11, display: "block", marginTop: 4 }}>Toque no X para tirar deste produto. Para voltar, toque no item riscado.</span>
+      <div className="tag-list">
+        {kept.map((o) => <span className="tag-item" key={o.name}>{o.name}{o.price > 0 ? ` (+${money(o.price)})` : ""}<button type="button" title="Remover deste produto" onClick={() => onChange([...hidden, o.name])}><X size={13} /></button></span>)}
+      </div>
+      {removed.length > 0 && <div className="tag-list">{removed.map((o) => <button type="button" className="tag-item removed" key={o.name} title="Voltar para o produto" onClick={() => onChange(hidden.filter((h) => h !== o.name))}><Plus size={12} /> {o.name}</button>)}</div>}
+    </div>
+  );
+}
+
+function ProductForm({ product, optionDb, categories, onSave, onCancel, onError }: { product: Product; optionDb: { borders: OptionItem[]; pizzaFlavors: OptionItem[] }; categories: string[]; onSave: (p: Product) => void; onCancel: () => void; onError: (m: string) => void }) {
   const [f, setF] = useState<Product>(product);
   const [saving, setSaving] = useState(false);
+  const activeKeys = stepKeysFor(f);
+  const catList = Array.from(new Set([...MENU_CATEGORIES, ...categories, f.category].filter((c) => c && c.trim())));
   return (
     <div className="product-form">
       <h3>{f.id ? "Editar produto" : "Novo produto"}</h3>
       <label>Nome<input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
       <label>Descrição<textarea rows={2} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></label>
-      <label>Preço (R$)<input type="number" step="0.01" min="0" value={f.price} onChange={(e) => setF({ ...f, price: Number(e.target.value) })} /></label>
-      <label>Categoria<input list="cats" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} /></label>
-      <datalist id="cats"><option value="Combos" /><option value="Pizzas" /><option value="Lanches" /><option value="Bebidas" /></datalist>
+      <label>Preço (R$) — pode deixar 0 se usar o texto abaixo<input type="number" step="0.01" min="0" value={f.price} onChange={(e) => setF({ ...f, price: Number(e.target.value) })} /></label>
+      <label>Texto no lugar do preço (opcional)<input value={f.price_label} placeholder="Ex.: A partir de R$ 39,90" onChange={(e) => setF({ ...f, price_label: e.target.value })} /></label>
+      <label>Categoria<select className="admin-select" value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })}>{catList.map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
       <label>Ordem no cardápio<input type="number" value={f.sort_order} onChange={(e) => setF({ ...f, sort_order: Number(e.target.value) })} /></label>
       <ImageField label="Foto do produto" value={f.image_url} folder="products" onChange={(url) => setF({ ...f, image_url: url })} onError={onError} />
-      <label className="check-label"><input type="checkbox" checked={f.is_combo} onChange={(e) => setF({ ...f, is_combo: e.target.checked })} /> É um combo (cliente escolhe sabores)</label>
-      <label className="check-label"><input type="checkbox" checked={f.requires_border} onChange={(e) => setF({ ...f, requires_border: e.target.checked })} /> Exigir Etapa de Borda</label>
-      <label className="check-label"><input type="checkbox" checked={f.allow_two_flavors} onChange={(e) => setF({ ...f, allow_two_flavors: e.target.checked })} /> Ativar etapa de escolha de até 2 sabores neste produto</label>
-      <label className="check-label"><input type="checkbox" checked={f.combo_flavors_step} onChange={(e) => setF({ ...f, combo_flavors_step: e.target.checked })} /> Ativar Etapa - Sabores do Combo (Até 2 sabores)</label>
+      {STEP_TOGGLES.map(([field, key, label]) => (
+        <div key={field}>
+          <label className="check-label"><input type="checkbox" checked={!!f[field]} onChange={(e) => setF({ ...f, [field]: e.target.checked })} /> {label}</label>
+          {activeKeys.includes(key) && <OptionPicker all={allStepOptions(key, optionDb)} hidden={f.hidden_options?.[key] ?? []} onChange={(h) => setF({ ...f, hidden_options: { ...f.hidden_options, [key]: h } })} />}
+        </div>
+      ))}
       <label className="check-label"><input type="checkbox" checked={f.available} onChange={(e) => setF({ ...f, available: e.target.checked })} /> Mostrar na loja</label>
       <ListEditor title="Ingredientes" items={f.ingredients} onChange={(v) => setF({ ...f, ingredients: v })} placeholder="Novo ingrediente" />
       <ListEditor title="Adicionais / Extras" items={f.extras} onChange={(v) => setF({ ...f, extras: v })} placeholder="Novo adicional" />
@@ -406,6 +441,13 @@ function SettingsForm({ settings, onSave, onError }: { settings: SettingsData; o
   const [saving, setSaving] = useState(false);
   return (
     <div className="settings-form">
+      <div className="settings-group">
+        <div className="modal-kicker">Dados da loja</div>
+        <label>Nome da loja<input value={f.store_name} onChange={(e) => setF({ ...f, store_name: e.target.value })} placeholder="PIZZA HOT" /></label>
+        <label>Número do WhatsApp da loja (recebe os pedidos)<input value={f.whatsapp_number} onChange={(e) => setF({ ...f, whatsapp_number: e.target.value })} placeholder="(43) 99630-9759" /></label>
+        <label>Horário de funcionamento<input value={f.opening_hours} onChange={(e) => setF({ ...f, opening_hours: e.target.value })} placeholder="Ex.: Aberto das 18h às 03h" /></label>
+        <label>Valor da oferta do Broto de Chocolate (R$)<input type="number" step="0.01" min="0" value={f.broto_price} onChange={(e) => setF({ ...f, broto_price: Number(e.target.value) })} /></label>
+      </div>
       <div className="settings-group">
         <div className="modal-kicker">Fotos do site</div>
         <ImageField label="Foto de capa (banner do topo)" value={f.cover_image_url} folder="site" onChange={(u) => setF({ ...f, cover_image_url: u })} onError={onError} />

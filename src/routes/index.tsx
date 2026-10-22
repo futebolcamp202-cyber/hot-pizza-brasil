@@ -1,16 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Clock3, Download, LocateFixed, MapPin, Minus, Plus, ShoppingBag, Sparkles, X, Search, Home, Store, Pizza, CupSoda, UtensilsCrossed, Phone, Truck } from "lucide-react";
+import { ArrowRight, Clock3, Download, LocateFixed, MapPin, Minus, Plus, ShoppingBag, Sparkles, X, Search, Home, Store, Pizza, CupSoda, UtensilsCrossed, Phone, Truck, Sandwich, Beer, Citrus, Drumstick, Cookie } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { COMBO_FLAVORS, TWO_FLAVORS_LIST, DEFAULT_SETTINGS, dedupeFlavors, fetchBorders, fetchFlavors, type Border, type Flavor, FALLBACK_IMG, deliveryFee, fetchProducts, fetchSettings, money, themeVars, type CartItem, type Product, type SettingsData } from "@/lib/store";
+import { DEFAULT_SETTINGS, dedupeFlavors, fetchBorders, fetchFlavors, type Border, type Flavor, FALLBACK_IMG, deliveryFee, fetchProducts, fetchSettings, money, themeVars, type CartItem, type Product, type SettingsData } from "@/lib/store";
+import { MENU_CATEGORIES, buildSteps, itemPrice, toggleChoice, whatsappLink, type OptionItem } from "@/lib/steps";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Nostra Casa Pizzaria e Lanches | Delivery em Londrina/PR" },
-      { name: "description", content: "Pizzas artesanais, combos e entrega rápida em Londrina/PR. Peça pelo site ou WhatsApp (43) 99630-9759." },
-      { property: "og:title", content: "Nostra Casa Pizzaria e Lanches" },
-      { property: "og:description", content: "Pizzas artesanais, combos e entrega rápida em Londrina/PR." },
+      { title: "Pizza Hot | Pizzas, lanches e pastéis em Londrina/PR" },
+      { name: "description", content: "Pizzas, lanches, pastéis, porções e bebidas com entrega em Londrina/PR. Peça pelo site ou WhatsApp." },
+      { property: "og:title", content: "Pizza Hot | Pizzaria e Lanches" },
+      { property: "og:description", content: "Pizzas, lanches, pastéis e combos com entrega rápida em Londrina/PR." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -19,7 +20,12 @@ export const Route = createFileRoute("/")({
 });
 
 type BeforeInstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
-const categoryIcons: Record<string, typeof Truck> = { Todos: UtensilsCrossed, Combos: Sparkles, Pizzas: Pizza, Bebidas: CupSoda };
+const categoryIcons: Record<string, typeof Truck> = {
+  Todos: UtensilsCrossed, Combos: Sparkles, Pizzas: Pizza, Bebidas: CupSoda, "COMBO LANCHE": Sparkles, "Pizzas salgadas": Pizza, "Pizzas doce": Pizza,
+  "Pastéis doces e salgados": Cookie, "Salgados de festa": Drumstick, "Delicioso churros": Cookie, "Lanches linha Smash": Sandwich, "Lanches linha Premium": Sandwich,
+  "Lanches econômica": Sandwich, "Hot dog e misto": Sandwich, "Porções": Drumstick, "Sucos naturais": Citrus, "Bebidas alcoólica": Beer,
+};
+const catOrder = (c: string) => { const i = MENU_CATEGORIES.findIndex((m) => m.toLowerCase() === c.trim().toLowerCase()); return i === -1 ? 999 : i; };
 
 function Storefront() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -31,10 +37,9 @@ function Storefront() {
   const [step, setStep] = useState<"none" | "combo" | "checkout" | "success">("none");
   const [selected, setSelected] = useState<Product | null>(null);
   const [comboStep, setComboStep] = useState(1);
-  const [border, setBorder] = useState("");
   const [flavorList, setFlavorList] = useState<Flavor[]>([]);
   const [borders, setBorders] = useState<Border[]>([]);
-  const [selectedFlavors, setSelectedFlavors] = useState<string[]>([]);
+  const [choices, setChoices] = useState<Record<string, string[]>>({});
   const [upsell, setUpsell] = useState(false);
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
   const [showInstall, setShowInstall] = useState(false);
@@ -85,27 +90,27 @@ function Storefront() {
 
   function flash(msg: string) { setNotice(msg); setTimeout(() => setNotice(""), 2200); }
 
-  const categories = ["Todos", ...Array.from(new Set(products.map((p) => p.category)))];
-  const activeFlavorList = selected?.combo_flavors_step ? COMBO_FLAVORS : selected?.allow_two_flavors && !selected?.is_combo ? TWO_FLAVORS_LIST : flavorList;
-  const flavors = useMemo(() => dedupeFlavors(activeFlavorList).map((f) => f.name), [activeFlavorList]);
-  const flavorDesc = useMemo(() => Object.fromEntries(activeFlavorList.map((f) => [f.name, f.description ?? ""])), [activeFlavorList]);
-  const comboSteps = useMemo(() => {
-    if (!selected) return [] as ("border" | "flavors" | "confirm")[];
-    const st: ("border" | "flavors" | "confirm")[] = [];
-    if (selected.requires_border && borders.length) st.push("border");
-    if (selected.is_combo) st.push("flavors", "confirm");
-    else if (selected.allow_two_flavors) st.push("flavors", "confirm");
-    else if (selected.combo_flavors_step) st.push("flavors");
-    return st;
-  }, [selected, borders.length]);
-  const curStep = comboSteps[comboStep - 1];
-  const borderObj = borders.find((b) => b.name === border);
+  const categories = ["Todos", ...Array.from(new Set(products.map((p) => p.category))).sort((a, b) => catOrder(a) - catOrder(b))];
+  const optionDb = useMemo(() => ({
+    borders: borders.map((b) => ({ name: b.name, price: b.price })),
+    pizzaFlavors: dedupeFlavors(flavorList).map((f) => ({ name: f.name, description: f.description ?? "", price: 0 })),
+  }), [borders, flavorList]);
+  const productSteps = useMemo(() => (selected ? buildSteps(selected, optionDb) : []), [selected, optionDb]);
+  const hasConfirm = !!selected && (selected.is_combo || selected.allow_two_flavors);
+  const totalSteps = productSteps.length + (hasConfirm ? 1 : 0);
+  const curStep = productSteps[comboStep - 1];
+  const chosenItems = productSteps.flatMap((s) => (choices[s.key] ?? []).map((n) => s.options.find((o) => o.name === n)).filter((o): o is OptionItem => !!o));
+  const choiceParts = productSteps.map((s) => { const sel = choices[s.key] ?? []; return sel.length ? (s.label ? `${s.label}: ${sel.join(" + ")}` : sel.join(" + ")) : ""; }).filter(Boolean);
+  const brotoPrice = Number(settings.broto_price) || 0;
   const visibleProducts = products.filter((p) =>
     (category === "Todos" || p.category === category) &&
     (!search || `${p.name} ${p.description} ${p.ingredients.join(" ")}`.toLowerCase().includes(search.toLowerCase())));
   const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
   const fee = orderType === "pickup" ? 0 : deliveryFee(Number(customer.distance) || 0);
   const total = subtotal + fee;
+  const storeName = settings.store_name || "PIZZA HOT";
+  const waNumber = settings.whatsapp_number || DEFAULT_SETTINGS.whatsapp_number;
+  const initials = storeName.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 
   const addToCart = (product: Product, details = "") => {
     setCart((items) => {
@@ -115,16 +120,18 @@ function Storefront() {
     flash("Adicionado ao carrinho");
   };
   const openProduct = (p: Product) => {
-    if (p.is_combo || p.allow_two_flavors || p.combo_flavors_step || (p.requires_border && borders.length)) { setSelected(p); setComboStep(1); setSelectedFlavors([]); setBorder(borders[0]?.name ?? ""); setStep("combo"); }
+    if (buildSteps(p, optionDb).length > 0) { setSelected(p); setComboStep(1); setChoices({}); setStep("combo"); }
     else addToCart(p);
+  };
+  const pick = (key: string, name: string, max: number) => {
+    const { next, blocked } = toggleChoice(choices[key] ?? [], name, max);
+    if (blocked) flash(`Máximo de ${max} sabores. Desmarque um antes.`);
+    setChoices((c) => ({ ...c, [key]: next }));
   };
   const finishCombo = (withDessert: boolean) => {
     if (!selected) return;
-    const hasBorder = comboSteps.includes("border");
-    const borderPrice = hasBorder ? borderObj?.price ?? 0 : 0;
-    const parts = [hasBorder ? border : "", comboSteps.includes("flavors") ? selectedFlavors.join(" + ") : "", selected.is_combo ? "Guaraná 2L" : "", withDessert ? "Broto de Chocolate" : ""].filter(Boolean);
-    const details = parts.join(" · ");
-    addToCart({ ...selected, price: selected.price + borderPrice + (withDessert ? 10 : 0) }, details);
+    const parts = [...choiceParts, selected.is_combo ? "Guaraná 2L" : "", withDessert ? `Broto de Chocolate (+${money(brotoPrice)})` : ""].filter(Boolean);
+    addToCart({ ...selected, price: itemPrice(selected.price, chosenItems, withDessert, brotoPrice) }, parts.join(" · "));
     setStep("none"); setUpsell(false);
   };
   const locate = () => {
@@ -143,8 +150,8 @@ function Storefront() {
     const info = orderType === "pickup"
       ? "*Retirada no Balcão*\nAv. Inglaterra, 210 - Londrina/PR"
       : `*Entrega (Delivery)*\nEndereço: ${customer.address}, ${customer.number} - ${customer.type}\nDistância: ${customer.distance} km\nTaxa: ${fee ? money(fee) : "A consultar"}`;
-    const msg = `*Novo Pedido - Nostra Casa*\n\n${lines}\n\nSubtotal: ${money(subtotal)}\nEntrega: ${orderType === "pickup" ? "Grátis (retirada)" : fee ? money(fee) : "A consultar"}\n*Total: ${money(total)}*\n\n${info}\n\nPagamento: ${paymentLabel}\n\nCliente: ${customer.name}`;
-    window.open(`https://wa.me/5543996309759?text=${encodeURIComponent(msg)}`, "_blank");
+    const msg = `*Novo Pedido - ${storeName}*\n\n${lines}\n\nSubtotal: ${money(subtotal)}\nEntrega: ${orderType === "pickup" ? "Grátis (retirada)" : fee ? money(fee) : "A consultar"}\n*Total: ${money(total)}*\n\n${info}\n\nPagamento: ${paymentLabel}\n\nCliente: ${customer.name}`;
+    window.open(whatsappLink(waNumber, msg), "_blank");
   };
   const placeOrder = async () => {
     if (!customer.name) return flash("Preencha seu nome");
@@ -172,16 +179,16 @@ function Storefront() {
     <div className="app" style={themeVars(settings)}>
       <header className="store-header">
         <div className="cover-banner">
-          <img src={settings.cover_image_url || FALLBACK_IMG} alt="Nostra Casa" />
+          <img src={settings.cover_image_url || FALLBACK_IMG} alt={storeName} />
           <div className="cover-overlay" />
         </div>
         <div className="store-header-info">
-          <div className="profile-circle"><img src={settings.profile_image_url || FALLBACK_IMG} alt="Logo Nostra Casa" /></div>
-          <h1 className="store-name">NOSTRA CASA</h1>
+          <div className="profile-circle"><img src={settings.profile_image_url || FALLBACK_IMG} alt={`Logo ${storeName}`} /></div>
+          <h1 className="store-name">{storeName}</h1>
           <p className="store-subtitle">Pizzaria &amp; Lanches</p>
           <div className="store-contact-row">
-            <a href="https://wa.me/5543996309759" target="_blank" rel="noreferrer" className="store-whatsapp"><Phone size={14} /> (43) 99630-9759</a>
-            <span className="store-hours"><Clock3 size={14} /> Aberto até 03h</span>
+            <a href={whatsappLink(waNumber)} target="_blank" rel="noreferrer" className="store-whatsapp"><Phone size={14} /> {waNumber}</a>
+            {settings.opening_hours && <span className="store-hours"><Clock3 size={14} /> {settings.opening_hours}</span>}
           </div>
           <div className="store-header-actions">
             <button className="install-btn install-btn-yellow" onClick={async () => { if (installEvent) { await installEvent.prompt(); setInstallEvent(null); } else { setShowInstall(true); } }}><Download size={16} /> Instalar App</button>
@@ -218,7 +225,7 @@ function Storefront() {
                   <h3>{p.name}</h3>
                   <p>{p.description}</p>
                   {p.ingredients.length > 0 && <div className="ingredient-tags">{p.ingredients.map((ing, i) => <span key={i}>{ing}</span>)}</div>}
-                  <strong className="price">{money(p.price)}</strong>
+                  <strong className="price">{p.price_label?.trim() || money(p.price)}</strong>
                 </div>
                 <button className="add-btn-h" onClick={() => openProduct(p)} aria-label={`Adicionar ${p.name}`}><Plus size={18} /></button>
               </article>
@@ -227,12 +234,12 @@ function Storefront() {
         </section>
         <section className="whatsapp-banner">
           <div><p className="eyebrow">Sem tempo para escolher?</p><h2>Peça pelo WhatsApp</h2><p>Fale direto com a nossa equipe e receba novidades e promoções.</p></div>
-          <a href="https://wa.me/5543996309759" target="_blank" rel="noreferrer" className="whatsapp-btn">Abrir WhatsApp <ArrowRight size={18} /></a>
+          <a href={whatsappLink(waNumber)} target="_blank" rel="noreferrer" className="whatsapp-btn">Abrir WhatsApp <ArrowRight size={18} /></a>
         </section>
       </main>
       <footer>
-        <div className="brand"><div className="brand-mark">NC</div><div><strong>NOSTRA CASA</strong><span>PIZZARIA & LANCHES</span></div></div>
-        <p>Feito com carinho em Londrina · (43) 99630-9759 · <Link to="/admin" style={{ color: "inherit" }}>Área do dono</Link></p>
+        <div className="brand"><div className="brand-mark">{initials}</div><div><strong>{storeName}</strong><span>PIZZARIA & LANCHES</span></div></div>
+        <p>Feito com carinho em Londrina · {waNumber} · <Link to="/admin" style={{ color: "inherit" }}>Área do dono</Link></p>
       </footer>
       <button className="cart-fab" onClick={() => setStep("checkout")}><ShoppingBag size={22} /><span>{cart.reduce((s, i) => s + i.quantity, 0)}</span></button>
       {notice && <div className="toast">{notice}</div>}
@@ -241,7 +248,7 @@ function Storefront() {
         <div className="modal-backdrop" onClick={() => setShowInstall(false)}><div className="modal install-modal" onClick={(e) => e.stopPropagation()}>
           <button className="close-btn" onClick={() => setShowInstall(false)}><X size={20} /></button>
           <div className="modal-kicker">Instalar App</div>
-          <h2>Tenha a Nostra Casa na sua tela inicial</h2>
+          <h2>Tenha a {storeName} na sua tela inicial</h2>
           {installOs === "ios" ? (
             <ol className="install-steps">
               <li><span className="install-num">1</span><div><strong>Abra no Safari</strong><p>Toque no botão <b>Compartilhar</b> (quadrado com seta ↑) na barra inferior.</p></div></li>
@@ -252,7 +259,7 @@ function Storefront() {
             <ol className="install-steps">
               <li><span className="install-num">1</span><div><strong>Abra o menu do Chrome</strong><p>Toque nos <b>três pontinhos ⋮</b> no canto superior direito.</p></div></li>
               <li><span className="install-num">2</span><div><strong>Instalar aplicativo</strong><p>Toque em <b>"Instalar aplicativo"</b> ou <b>"Adicionar à tela inicial"</b>.</p></div></li>
-              <li><span className="install-num">3</span><div><strong>Confirme</strong><p>Toque em <b>"Instalar"</b>. O ícone da Nostra Casa aparecerá na sua tela.</p></div></li>
+              <li><span className="install-num">3</span><div><strong>Confirme</strong><p>Toque em <b>"Instalar"</b>. O ícone da {storeName} aparecerá na sua tela.</p></div></li>
             </ol>
           )}
           <button className="secondary-btn full" onClick={() => setShowInstall(false)}>Entendi</button>
@@ -262,19 +269,20 @@ function Storefront() {
       {step === "combo" && selected && (
         <div className="modal-backdrop"><div className="modal combo-modal">
           <button className="close-btn" onClick={() => setStep("none")}><X size={20} /></button>
-          <div className="modal-kicker">{selected.is_combo ? "Monte seu combo" : "Monte sua pizza"} · Etapa {comboStep} de {comboSteps.length}</div>
-          <h2>{curStep === "border" ? "Escolha a sua borda" : curStep === "flavors" ? "Escolha os sabores" : "Tudo certo por aqui?"}</h2>
-          {curStep === "border" && <div className="choice-list">{borders.map((b) => <button className={border === b.name ? "choice selected" : "choice"} key={b.id} onClick={() => setBorder(b.name)}>{b.name}<span>{b.price ? `+ ${money(b.price)}` : "Grátis"}</span></button>)}</div>}
-          {curStep === "flavors" && <><p className="muted">Selecione até 2 sabores para a sua pizza.</p><div className="flavor-grid">{flavors.map((f) => <button key={f} className={selectedFlavors.includes(f) ? "flavor selected" : "flavor"} onClick={() => setSelectedFlavors((c) => { if (c.includes(f)) return c.filter((x) => x !== f); if (c.length >= 2) { flash("Máximo de 2 sabores. Desmarque um antes."); return c; } return [...c, f]; })}>{f}{flavorDesc[f] && <small style={{ display: "block", opacity: 0.7, fontWeight: 400, fontSize: 11, marginTop: 2 }}>{flavorDesc[f]}</small>}</button>)}</div></>}
-          {curStep === "confirm" && <div className="confirmation"><div className="confirm-icon">✓</div><p>{selected.is_combo && <><strong>Guaraná 2L confirmado.</strong><br /></>}Sua {selected.is_combo ? "combinação" : "pizza"} será preparada{comboSteps.includes("border") ? ` com ${border.toLowerCase()}` : ""} com {selectedFlavors.join(" + ")}.</p></div>}
-          <button className="primary-btn full" disabled={(curStep === "flavors" && selectedFlavors.length === 0) || (curStep === "border" && !border)} onClick={() => (comboStep < comboSteps.length ? setComboStep(comboStep + 1) : selected?.is_combo || selected?.allow_two_flavors ? setUpsell(true) : finishCombo(false))}>{comboStep < comboSteps.length || curStep === "flavors" ? "Continuar" : "Adicionar ao carrinho"} <ArrowRight size={18} /></button>
+          <div className="modal-kicker">{selected.is_combo ? "Monte seu combo" : selected.pastel_flavors_step ? "Monte seu pastel" : "Monte sua pizza"} · Etapa {comboStep} de {totalSteps}</div>
+          <h2>{curStep ? curStep.title : "Tudo certo por aqui?"}</h2>
+          {curStep && curStep.key.endsWith("border") && <><p className="muted">{curStep.subtitle}</p><div className="choice-list">{curStep.options.map((o) => <button className={(choices[curStep.key] ?? []).includes(o.name) ? "choice selected" : "choice"} key={o.name} onClick={() => pick(curStep.key, o.name, 1)}>{o.name}<span>{o.price ? `+ ${money(o.price)}` : "Grátis"}</span></button>)}</div></>}
+          {curStep && !curStep.key.endsWith("border") && <><p className="muted">{curStep.subtitle}</p><div className="flavor-grid">{curStep.options.map((o) => <button key={o.name} className={(choices[curStep.key] ?? []).includes(o.name) ? "flavor selected" : "flavor"} onClick={() => pick(curStep.key, o.name, curStep.max)}>{o.name}{o.price > 0 && ` (+${money(o.price)})`}{o.description && <small style={{ display: "block", opacity: 0.7, fontWeight: 400, fontSize: 11, marginTop: 2 }}>{o.description}</small>}</button>)}</div></>}
+          {!curStep && <div className="confirmation"><div className="confirm-icon">✓</div><p>{selected.is_combo && <><strong>Guaraná 2L confirmado.</strong><br /></>}Sua {selected.is_combo ? "combinação" : "pizza"} será preparada com: {choiceParts.join(" · ")}.</p></div>}
+          <p className="muted" style={{ textAlign: "right", margin: "0 0 10px" }}>Valor: <strong>{money(itemPrice(selected.price, chosenItems, false, brotoPrice))}</strong></p>
+          <button className="primary-btn full" disabled={!!curStep && (choices[curStep.key] ?? []).length === 0} onClick={() => (comboStep < totalSteps ? setComboStep(comboStep + 1) : hasConfirm ? setUpsell(true) : finishCombo(false))}>{comboStep < totalSteps ? "Continuar" : "Adicionar ao carrinho"} <ArrowRight size={18} /></button>
         </div></div>
       )}
       {upsell && (
         <div className="modal-backdrop"><div className="modal upsell">
           <div className="dessert-art">●</div>
           <div className="modal-kicker">Um toque doce?</div>
-          <h2>Gostaria de adicionar um Broto de Chocolate por R$ 10,00?</h2>
+          <h2>Gostaria de adicionar um Broto de Chocolate por {money(brotoPrice)}?</h2>
           <div className="upsell-actions">
             <button className="secondary-btn" onClick={() => finishCombo(false)}>Não, obrigado</button>
             <button className="primary-btn" onClick={() => finishCombo(true)}>Sim, adicionar</button>
