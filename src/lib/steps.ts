@@ -104,8 +104,8 @@ export function allStepOptions(key: StepKey, db: { borders: OptionItem[]; pizzaF
 }
 
 const META: Record<StepKey, Omit<StepDef, "key" | "options">> = {
-  border: { title: "Escolha a sua borda", subtitle: "Selecione uma opção.", label: "Borda", max: 1 },
-  trad_border: { title: "Bordas Massas Tradicionais", subtitle: "Selecione uma opção.", label: "Borda", max: 1 },
+  border: { title: "Escolha a sua borda", subtitle: "Selecione uma opção.", label: "", max: 1 },
+  trad_border: { title: "Bordas Massas Tradicionais", subtitle: "Selecione uma opção.", label: "", max: 1 },
   combo_flavors: { title: "Escolha os sabores", subtitle: "Selecione até 2 sabores para a sua pizza.", label: "Sabores", max: 2 },
   two_flavors: { title: "Escolha os sabores", subtitle: "Selecione até 2 sabores para a sua pizza.", label: "Sabores", max: 2 },
   pizza_flavors: { title: "Escolha os sabores", subtitle: "Selecione até 2 sabores para a sua pizza.", label: "Sabores", max: 2 },
