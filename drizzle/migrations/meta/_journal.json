@@ -8,6 +8,13 @@
       "when": 1792655902259,
       "tag": "0000_steps_price_label_store_info",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792723895872,
+      "tag": "0001_categories",
+      "breakpoints": true
     }
   ]
 }
