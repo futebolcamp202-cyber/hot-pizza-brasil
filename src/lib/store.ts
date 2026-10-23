@@ -118,3 +118,10 @@ export async function fetchBorders(): Promise<Border[]> {
   if (error) throw error;
   return (data ?? []).map((b: any) => ({ id: b.id, name: b.name, price: Number(b.price), sort_order: b.sort_order }));
 }
+
+export type Category = { id: string; name: string; sort_order: number };
+export async function fetchCategories(): Promise<Category[]> {
+  const { data, error } = await supabase.from("categories").select("id,name,sort_order").order("sort_order").order("created_at");
+  if (error) throw error;
+  return data ?? [];
+}
