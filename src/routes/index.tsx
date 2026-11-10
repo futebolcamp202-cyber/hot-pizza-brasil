@@ -8,10 +8,10 @@ import { MENU_CATEGORIES, buildSteps, itemPrice, toggleChoice, whatsappLink, typ
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Pizza Hot | Pizzas, lanches e pastéis em Londrina/PR" },
-      { name: "description", content: "Pizzas, lanches, pastéis, porções e bebidas com entrega em Londrina/PR. Peça pelo site ou WhatsApp." },
+      { title: "Pizza Hot | Pizzas, lanches e pastéis em Araraquara/SP" },
+      { name: "description", content: "Pizzas, lanches, pastéis, porções e bebidas com entrega em Araraquara/SP. Peça pelo site ou WhatsApp." },
       { property: "og:title", content: "Pizza Hot | Pizzaria e Lanches" },
-      { property: "og:description", content: "Pizzas, lanches, pastéis e combos com entrega rápida em Londrina/PR." },
+      { property: "og:description", content: "Pizzas, lanches, pastéis e combos com entrega rápida em Araraquara/SP." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -148,7 +148,7 @@ function Storefront() {
     const lines = cart.map((i) => `• ${i.quantity}x ${i.name}${i.details ? `\n   Detalhes: ${i.details}` : ""}\n   Valor unitário: ${money(i.price)}\n   Valor do item: ${money(i.price * i.quantity)}`).join("\n\n");
     const paymentLabel = customer.payment === "Pix" ? "Pix (maquininha)" : customer.payment === "Dinheiro" ? `Dinheiro${customer.change ? ` (Troco para ${money(Number(customer.change))})` : ""}` : "Cartão (maquininha)";
     const info = orderType === "pickup"
-      ? "*Retirada no Balcão*\nAv. Inglaterra, 210 - Londrina/PR"
+      ? "*Retirada no Balcão*\nAlameda Paulista, 1115 - Vila Xavier, Araraquara/SP"
       : `*Entrega (Delivery)*\nEndereço: ${customer.address}, ${customer.number} - ${customer.type}\nDistância: ${customer.distance} km\nTaxa: ${fee ? money(fee) : "A consultar"}`;
     const msg = `*Novo Pedido - ${storeName}*\n\n${lines}\n\nSubtotal: ${money(subtotal)}\nEntrega: ${orderType === "pickup" ? "Grátis (retirada)" : fee ? money(fee) : "A consultar"}\n*Total: ${money(total)}*\n\n${info}\n\nPagamento: ${paymentLabel}\n\nCliente: ${customer.name}`;
     window.open(whatsappLink(waNumber, msg), "_blank");
@@ -210,7 +210,7 @@ function Storefront() {
         <section id="menu" className="menu-section">
           <div className="section-heading">
             <div><p className="eyebrow">Escolha o seu momento</p><h2>Cardápio da casa</h2></div>
-            <p className="address"><MapPin size={15} /> Avenida Inglaterra, 210<br />Londrina / PR</p>
+            <p className="address"><MapPin size={15} /> Alameda Paulista, 1115<br />Araraquara / SP</p>
           </div>
           <div className="product-list">
             {loading && <p className="muted" style={{ textAlign: "center", padding: "40px 0" }}>Carregando cardápio...</p>}
@@ -239,7 +239,7 @@ function Storefront() {
       </main>
       <footer>
         <div className="brand"><div className="brand-mark">{initials}</div><div><strong>{storeName}</strong><span>PIZZARIA & LANCHES</span></div></div>
-        <p>Feito com carinho em Londrina · {waNumber} · <Link to="/admin" style={{ color: "inherit" }}>Área do dono</Link></p>
+        <p>Feito com carinho em Araraquara · {waNumber} · <Link to="/admin" style={{ color: "inherit" }}>Área do dono</Link></p>
       </footer>
       <button className="cart-fab" onClick={() => setStep("checkout")}><ShoppingBag size={22} /><span>{cart.reduce((s, i) => s + i.quantity, 0)}</span></button>
       {notice && <div className="toast">{notice}</div>}
@@ -319,7 +319,7 @@ function Storefront() {
                   <label>Tipo<select value={customer.type} onChange={(e) => setCustomer({ ...customer, type: e.target.value })}><option>Casa</option><option>Apartamento</option></select></label>
                   <label className="distance-field">Distância estimada (km)<div className="input-action"><input value={customer.distance} onChange={(e) => setCustomer({ ...customer, distance: e.target.value })} /><button onClick={locate}><LocateFixed size={17} /></button></div></label>
                 </>}
-                {orderType === "pickup" && <p className="payment-info">Retirada na loja: Avenida Inglaterra, 210 - Londrina/PR. Sem taxa de entrega.</p>}
+                {orderType === "pickup" && <p className="payment-info">Retirada na loja: Alameda Paulista, 1115 - Vila Xavier, Araraquara/SP. Sem taxa de entrega.</p>}
                 <label>Pagamento<select value={customer.payment} onChange={(e) => setCustomer({ ...customer, payment: e.target.value, change: "" })}><option>Dinheiro</option><option>Cartão</option><option>Pix</option></select></label>
                 {customer.payment === "Dinheiro" && <label>Troco para<input value={customer.change} onChange={(e) => setCustomer({ ...customer, change: e.target.value })} placeholder="100" /></label>}
                 {customer.payment === "Cartão" && <p className="payment-info">Pagamento na maquininha {orderType === "pickup" ? "no caixa da loja" : "na entrega"}.</p>}

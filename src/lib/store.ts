@@ -54,7 +54,7 @@ export const DEFAULT_SETTINGS: SettingsData = {
   primary_color: "#f3b91b",
   background_color: "#090909",
   button_color: "#d71920",
-  receipt_header: "PIZZA HOT\nAvenida Inglaterra, 210 - Londrina/PR\nWhatsApp: (43) 99630-9759",
+  receipt_header: "PIZZA HOT\nAlameda Paulista, 1115 - Vila Tito de Carvalho (Vila Xavier), Araraquara - SP, 14810-270, Brasil\nWhatsApp: (43) 99630-9759",
   favicon_url: null,
   cover_image_url: null,
   profile_image_url: null,
